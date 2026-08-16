@@ -90,15 +90,12 @@ npm run scheduler # Daily cron scheduler
 
 | Guide | Cost | Best for |
 |-------|------|----------|
-| **[DEPLOY-FREE.md](./DEPLOY-FREE.md)** | **$0** | Oracle Cloud VM, split free tier, local PC |
-| **[DEPLOY.md](./DEPLOY.md)** | ~$25/mo | Render managed hosting |
+| **[DEPLOY-FREE.md](./DEPLOY-FREE.md)** | **$0** | Render free + Neon PostgreSQL |
+| **[DEPLOY.md](./DEPLOY.md)** | ~$25/mo | Render paid managed hosting |
 
-| Platform | What to deploy |
-|----------|----------------|
-| **Oracle Cloud** (free VM) | Full stack via `docker-compose.prod.yml` |
-| **Vercel + Fly.io + Neon + Upstash** | Split free tier |
-| **Render** | Full stack via `render.yaml` blueprint |
-| **Vercel** | Frontend only |
+**Free tier stack:** Render (web) + Neon (database) + cron-job.org (scheduler) = **$0/month**
+
+No Redis, no Docker, no paid services required.
 
 ## Configuration
 
