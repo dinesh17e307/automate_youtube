@@ -12,7 +12,12 @@ export default function Settings() {
   const [config, setConfig] = useState<ChannelConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [youtubeStatus, setYoutubeStatus] = useState<{ configured: boolean; authenticated: boolean } | null>(null);
+  const [youtubeStatus, setYoutubeStatus] = useState<{
+    configured: boolean;
+    authenticated: boolean;
+    redirectUri?: string;
+    setupHint?: string;
+  } | null>(null);
 
   useEffect(() => {
     api.getConfig().then(setConfig).catch(console.error);
@@ -139,7 +144,7 @@ export default function Settings() {
               <p className="text-xs text-gray-400 mt-1">
                 {youtubeStatus?.configured
                   ? 'YouTube API credentials configured'
-                  : 'Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in .env'}
+                  : 'Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET on Render'}
               </p>
             </div>
             {youtubeStatus?.configured && !youtubeStatus.authenticated && (
@@ -151,6 +156,26 @@ export default function Settings() {
               </button>
             )}
           </div>
+
+          {youtubeStatus?.redirectUri && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm">
+              <p className="font-bold text-yellow-800 mb-2">Google Cloud setup required</p>
+              <p className="text-yellow-700 text-xs mb-2">
+                Add this <strong>exact</strong> redirect URI in Google Cloud Console:
+              </p>
+              <code className="block bg-white p-2 rounded text-xs break-all text-gray-800 border">
+                {youtubeStatus.redirectUri}
+              </code>
+              <ol className="text-xs text-yellow-700 mt-3 space-y-1 list-decimal list-inside">
+                <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="underline">Google Cloud Credentials</a></li>
+                <li>Open your OAuth 2.0 Client ID</li>
+                <li>Under <strong>Authorized redirect URIs</strong>, click Add URI and paste the URL above</li>
+                <li>Enable <strong>YouTube Data API v3</strong> in the API Library</li>
+                <li>Add your Google account as a <strong>Test user</strong> on the OAuth consent screen (if app is in Testing mode)</li>
+                <li>Save, wait 1–2 minutes, then click Connect YouTube again</li>
+              </ol>
+            </div>
+          )}
         </Section>
 
         <button

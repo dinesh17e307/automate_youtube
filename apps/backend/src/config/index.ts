@@ -1,15 +1,20 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import { resolveFrontendUrl, resolveYoutubeRedirectUri } from '../utils/public-url';
 
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 }
 
 const isFreeTier = process.env.FREE_TIER === 'true';
+const frontendUrl = resolveFrontendUrl();
+const youtubeRedirectUri = resolveYoutubeRedirectUri();
 
 const corsOrigin = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
-  : undefined;
+  : frontendUrl !== 'http://localhost:5173'
+    ? [frontendUrl]
+    : undefined;
 
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
@@ -20,8 +25,9 @@ export const config = {
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   youtubeClientId: process.env.YOUTUBE_CLIENT_ID || '',
   youtubeClientSecret: process.env.YOUTUBE_CLIENT_SECRET || '',
-  youtubeRedirectUri: process.env.YOUTUBE_REDIRECT_URI || 'http://localhost:3001/api/youtube/callback',
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  youtubeRedirectUri,
+  frontendUrl,
+  publicUrl: frontendUrl,
   corsOrigin,
   cronSecret: process.env.CRON_SECRET || '',
   serveFrontend: process.env.SERVE_FRONTEND === 'true' || isFreeTier,

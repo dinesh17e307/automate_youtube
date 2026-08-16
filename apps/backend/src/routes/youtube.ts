@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
+import { config } from '../config';
 import { youtubeService } from '../services/youtube/youtube-service';
 
 const router = Router();
@@ -32,6 +33,8 @@ router.get('/status', async (_req: Request, res: Response) => {
   res.json({
     configured: youtubeService.isConfigured(),
     authenticated: isAuthenticated,
+    redirectUri: config.youtubeRedirectUri,
+    setupHint: 'Add redirectUri to Google Cloud Console → APIs & Services → Credentials → OAuth client → Authorized redirect URIs',
   });
 });
 

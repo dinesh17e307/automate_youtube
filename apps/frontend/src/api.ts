@@ -42,7 +42,7 @@ export const api = {
   getConfig: () => fetchApi<ChannelConfig>('/config'),
   updateConfig: (data: Partial<ChannelConfig>) =>
     fetchApi<ChannelConfig>('/config', { method: 'PUT', body: JSON.stringify(data) }),
-  getYouTubeStatus: () => fetchApi<{ configured: boolean; authenticated: boolean }>('/youtube/status'),
+  getYouTubeStatus: () => fetchApi<{ configured: boolean; authenticated: boolean; redirectUri?: string; setupHint?: string }>('/youtube/status'),
   getYouTubeAuth: () => fetchApi<{ authUrl: string }>('/youtube/auth'),
   getCharacters: () => fetchApi<Character[]>('/youtube/characters'),
 };

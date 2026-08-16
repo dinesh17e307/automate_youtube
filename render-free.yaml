@@ -33,5 +33,6 @@ services:
         sync: false
       - key: YOUTUBE_CLIENT_SECRET
         sync: false
+      # Optional — auto-detected from RENDER_EXTERNAL_URL if omitted
       - key: YOUTUBE_REDIRECT_URI
         sync: false

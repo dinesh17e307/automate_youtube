@@ -61,6 +61,9 @@ async function start() {
 
   app.listen(config.port, () => {
     logger.info(`Server running on port ${config.port} (freeTier=${config.freeTier})`);
+    if (config.youtubeClientId) {
+      logger.info(`YouTube OAuth redirect URI: ${config.youtubeRedirectUri}`);
+    }
     if (config.freeTier) {
       logger.info('Free tier mode: use /api/cron/keep-alive with CRON_SECRET to prevent sleep');
     }
