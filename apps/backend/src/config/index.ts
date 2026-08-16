@@ -23,6 +23,8 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/kids_youtube',
   storagePath: process.env.STORAGE_PATH || path.resolve(__dirname, '../../../storage'),
   openaiApiKey: process.env.OPENAI_API_KEY || '',
+  geminiApiKey: process.env.GEMINI_API_KEY || '',
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
   youtubeClientId: process.env.YOUTUBE_CLIENT_ID || '',
   youtubeClientSecret: process.env.YOUTUBE_CLIENT_SECRET || '',
   youtubeRedirectUri,

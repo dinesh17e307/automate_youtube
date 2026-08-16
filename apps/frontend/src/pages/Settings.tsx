@@ -126,12 +126,12 @@ export default function Settings() {
 
               {/* OpenAI */}
               <StatusCard
-                title="OpenAI API"
+                title="LLM Provider"
                 status={systemStatus.openai.status}
                 message={systemStatus.openai.message}
                 detail={systemStatus.openai.limitsNote}
                 link={systemStatus.openai.usageUrl}
-                linkLabel="View OpenAI usage & limits"
+                linkLabel={systemStatus.openai.activeProvider === 'gemini' ? 'Get Gemini API key' : systemStatus.openai.activeProvider === 'openai' ? 'View OpenAI usage' : 'Get free Gemini key'}
               />
 
               {/* Hosting */}
@@ -257,8 +257,12 @@ export default function Settings() {
         </Section>
 
         <Section title="AI Providers">
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 mb-3">
+            <p className="font-bold mb-1">OpenAI quota exceeded?</p>
+            <p>Switch LLM to <strong>gemini</strong> (free tier from Google) or <strong>mock</strong> (no API cost). Cursor&apos;s AI cannot be used in deployed apps — it only works inside the Cursor editor.</p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
-            <SelectField label="LLM" value={config.llmProvider} options={['openai', 'mock']} onChange={(v) => setConfig({ ...config, llmProvider: v })} />
+            <SelectField label="LLM" value={config.llmProvider} options={['gemini', 'mock', 'openai']} onChange={(v) => setConfig({ ...config, llmProvider: v })} />
             <SelectField label="Image" value={config.imageProvider} options={['openai', 'mock']} onChange={(v) => setConfig({ ...config, imageProvider: v })} />
             <SelectField label="TTS" value={config.ttsProvider} options={['openai', 'mock']} onChange={(v) => setConfig({ ...config, ttsProvider: v })} />
             <SelectField label="Music" value={config.musicProvider} options={['mock']} onChange={(v) => setConfig({ ...config, musicProvider: v })} />

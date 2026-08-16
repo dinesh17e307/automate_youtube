@@ -88,10 +88,13 @@ export async function getSystemStatus(): Promise<SystemStatus> {
     whyStuck.push('CRON_SECRET not set — daily automation and keep-alive won\'t work');
   }
   if (!config.openaiApiKey && llmProvider === 'openai') {
-    whyStuck.push('OPENAI_API_KEY missing but provider is set to openai — using fallback may fail');
+    whyStuck.push('OPENAI_API_KEY missing but provider is set to openai — switch to gemini or mock in Settings');
+  }
+  if (!config.geminiApiKey && llmProvider === 'gemini') {
+    whyStuck.push('GEMINI_API_KEY missing but provider is set to gemini — get a free key at aistudio.google.com');
   }
   if (openaiStatus.status === 'error') {
-    whyStuck.push(`OpenAI issue: ${openaiStatus.message}`);
+    whyStuck.push(`LLM issue: ${openaiStatus.message} — try switching to gemini or mock in Settings`);
   }
   if (stuckRendering > 0) {
     whyStuck.push(`${stuckRendering} video(s) stuck at rendering — click Retry Rendering`);
@@ -139,16 +142,72 @@ export async function getSystemStatus(): Promise<SystemStatus> {
 }
 
 async function checkOpenAiStatus(activeProvider: string): Promise<SystemStatus['openai']> {
+  if (activeProvider === 'mock') {
+    return {
+      configured: true,
+      activeProvider,
+      status: 'mock',
+      message: 'Using mock LLM — free demo content, no API cost',
+      limitsNote: 'Switch to gemini (free tier) or openai in Settings for AI-generated scripts.',
+      usageUrl: 'https://aistudio.google.com/apikey',
+    };
+  }
+
+  if (activeProvider === 'gemini') {
+    const usageUrl = 'https://aistudio.google.com/apikey';
+    const limitsNote = 'Gemini free tier has daily request limits. If exceeded, switch to mock temporarily.';
+
+    if (!config.geminiApiKey) {
+      return {
+        configured: false,
+        activeProvider,
+        status: 'not_configured',
+        message: 'GEMINI_API_KEY not set — get a free key at aistudio.google.com and add it to Render env vars',
+        limitsNote,
+        usageUrl,
+      };
+    }
+
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.geminiApiKey}`);
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`${response.status} ${body}`);
+      }
+      return {
+        configured: true,
+        activeProvider,
+        status: 'ok',
+        message: `Gemini API key valid — using ${config.geminiModel}`,
+        limitsNote,
+        usageUrl,
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      logger.warn('Gemini status check failed', { error: msg });
+      return {
+        configured: true,
+        activeProvider,
+        status: 'error',
+        message: msg.includes('401') || msg.includes('API key')
+          ? 'Invalid GEMINI_API_KEY — check Render env vars'
+          : `Gemini API error: ${msg.substring(0, 120)}`,
+        limitsNote,
+        usageUrl,
+      };
+    }
+  }
+
   const usageUrl = 'https://platform.openai.com/usage';
   const limitsNote =
-    'OpenAI limits depend on your plan (free trial, pay-as-you-go, etc.). Check usage dashboard for rate limits and billing.';
+    'OpenAI quota exceeded? Switch to gemini (free) or mock in Settings → AI Providers.';
 
   if (activeProvider !== 'openai') {
     return {
       configured: false,
       activeProvider,
       status: 'mock',
-      message: `Using "${activeProvider}" provider — no OpenAI API calls (no cost, demo content)`,
+      message: `Using "${activeProvider}" provider`,
       limitsNote,
       usageUrl,
     };
@@ -159,7 +218,7 @@ async function checkOpenAiStatus(activeProvider: string): Promise<SystemStatus['
       configured: false,
       activeProvider,
       status: 'not_configured',
-      message: 'OPENAI_API_KEY not set on server — set it in Render env vars',
+      message: 'OPENAI_API_KEY not set on server — set it in Render env vars or switch to gemini/mock',
       limitsNote,
       usageUrl,
     };
@@ -173,8 +232,7 @@ async function checkOpenAiStatus(activeProvider: string): Promise<SystemStatus['
       activeProvider,
       status: 'ok',
       message: 'API key valid — connected to OpenAI',
-      limitsNote:
-        'If generation fails with "rate limit" or "quota exceeded", you hit OpenAI limits. Wait or upgrade at platform.openai.com.',
+      limitsNote,
       usageUrl,
     };
   } catch (error) {
@@ -183,11 +241,11 @@ async function checkOpenAiStatus(activeProvider: string): Promise<SystemStatus['
 
     let friendly = msg;
     if (msg.includes('429') || msg.toLowerCase().includes('rate limit')) {
-      friendly = 'Rate limit exceeded — too many requests. Wait a few minutes or check billing.';
+      friendly = 'Rate limit exceeded — switch to gemini or mock in Settings';
     } else if (msg.includes('401') || msg.toLowerCase().includes('incorrect api key')) {
       friendly = 'Invalid API key — check OPENAI_API_KEY on Render';
     } else if (msg.includes('insufficient_quota') || msg.toLowerCase().includes('quota')) {
-      friendly = 'Quota exceeded — add billing or credits at platform.openai.com';
+      friendly = 'Quota exceeded — switch to gemini (free) or mock in Settings, or add billing at platform.openai.com';
     }
 
     return {

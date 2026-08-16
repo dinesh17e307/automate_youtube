@@ -1,4 +1,4 @@
-import { createLlmProvider } from './providers/openai-llm';
+import { createLlmProvider } from './providers/llm-factory';
 import { createImageProvider, createTtsProvider, createMusicProvider } from './providers/mock-media';
 import { prisma } from '../../db';
 import type { LlmProvider, ImageProvider, TtsProvider, MusicProvider } from './interfaces';
