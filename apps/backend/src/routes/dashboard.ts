@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { pipelineService } from '../services/pipeline/pipeline-service';
-import { dailyPipelineQueue, contentGenerationQueue, getQueueStats } from '../queues';
-import { clearProviderCache } from '../services/ai/factory';
+import { enqueueJob, getQueueStats, JOB_TYPES } from '../queues';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -137,7 +136,7 @@ router.post('/content/generate', async (req: Request, res: Response) => {
   try {
     const { type = 'long' } = req.body;
     const content = await pipelineService.createContent(type);
-    await contentGenerationQueue.add('generate', { contentId: content.id, stage: 'start' });
+    await enqueueJob(JOB_TYPES.CONTENT_GENERATION, { contentId: content.id, stage: 'start' });
     res.json({ message: 'Content generation started', content });
   } catch (error) {
     res.status(500).json({ error: 'Failed to start content generation' });
@@ -168,7 +167,7 @@ router.post('/content/:id/regenerate/:stage', async (req: Request, res: Response
 router.post('/pipeline/trigger', async (_req: Request, res: Response) => {
   try {
     const date = new Date().toISOString().split('T')[0];
-    await dailyPipelineQueue.add('manual-trigger', { date, contentType: 'both' });
+    await enqueueJob(JOB_TYPES.DAILY_PIPELINE, { date, contentType: 'both' });
     res.json({ message: 'Daily pipeline triggered', date });
   } catch (error) {
     res.status(500).json({ error: 'Failed to trigger pipeline' });

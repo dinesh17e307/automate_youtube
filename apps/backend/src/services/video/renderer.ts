@@ -1,4 +1,4 @@
-import ffmpeg from 'fluent-ffmpeg';
+import { ffmpeg, initFfmpeg } from './ffmpeg';
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuid } from 'uuid';
@@ -43,6 +43,7 @@ function escapeDrawtext(text: string): string {
 }
 
 export async function renderVideo(options: RenderOptions): Promise<string> {
+  initFfmpeg();
   const { scenes, sceneImages, voiceFiles, musicFile, script, format } = options;
   const { width, height } = getDimensions(format);
   const outputDir = options.outputDir || path.join(config.storagePath, 'videos');
@@ -143,6 +144,7 @@ export async function generateThumbnail(
   title: string,
   format: 'long' | 'short' = 'long'
 ): Promise<string> {
+  initFfmpeg();
   const { width, height } = getDimensions(format);
   const outputDir = path.join(config.storagePath, 'thumbnails');
   await ensureDir(outputDir);

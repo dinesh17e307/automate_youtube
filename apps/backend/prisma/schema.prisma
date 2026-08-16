@@ -124,3 +124,21 @@ model TopicHistory {
   contentId String?
   score     Float?
 }
+
+model PipelineJob {
+  id          String    @id @default(uuid())
+  type        String
+  payload     Json      @default("{}")
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  error       String?
+  scheduledAt DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, scheduledAt])
+  @@index([type])
+}

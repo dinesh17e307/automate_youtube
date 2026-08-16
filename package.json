@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w @kids-youtube/backend\" \"npm run dev -w @kids-youtube/frontend\"",
     "build": "npm run build -w @kids-youtube/shared && npm run build -w @kids-youtube/backend && npm run build -w @kids-youtube/frontend",
+    "build:free": "npm run build -w @kids-youtube/shared && npm run build -w @kids-youtube/frontend && npm run db:generate -w @kids-youtube/backend && npm run build -w @kids-youtube/backend",
+    "start:free": "npm run start:free -w @kids-youtube/backend",
     "db:migrate": "npm run db:migrate -w @kids-youtube/backend",
     "db:generate": "npm run db:generate -w @kids-youtube/backend",
     "worker": "npm run worker -w @kids-youtube/backend",

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { config } from '../config';
 import { logger } from '../utils/logger';
 
 export const prisma = new PrismaClient({
@@ -14,8 +15,22 @@ prisma.$on('warn' as never, (e: unknown) => logger.warn('Prisma warning', e));
 export async function ensureDefaultConfig() {
   const existing = await prisma.channelConfig.findFirst();
   if (!existing) {
-    await prisma.channelConfig.create({ data: {} });
+    await prisma.channelConfig.create({
+      data: {
+        videoDurationMin: config.defaultVideoDurationMin,
+        videoDurationMax: config.defaultVideoDurationMax,
+      },
+    });
     logger.info('Created default channel configuration');
+  } else if (config.freeTier) {
+    // Cap durations on free tier to save memory/time
+    await prisma.channelConfig.update({
+      where: { id: existing.id },
+      data: {
+        videoDurationMin: Math.min(existing.videoDurationMin, config.defaultVideoDurationMin),
+        videoDurationMax: Math.min(existing.videoDurationMax, config.defaultVideoDurationMax),
+      },
+    });
   }
 }
 

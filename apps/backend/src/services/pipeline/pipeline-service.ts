@@ -7,7 +7,7 @@ import { logger } from '../../utils/logger';
 import { config } from '../../config';
 import type { Script, Scene, Character, ContentMetadata, ContentCategory } from '@kids-youtube/shared';
 import { CONTENT_CATEGORIES } from '@kids-youtube/shared';
-import type { ContentGenerationJob, DailyPipelineJob, VideoRenderingJob, YouTubeUploadJob } from '../../queues';
+import type { ContentGenerationJob, DailyPipelineJob } from '../../queues';
 
 export class PipelineService {
   async runDailyPipeline(job: DailyPipelineJob): Promise<void> {
@@ -522,14 +522,6 @@ export async function handleContentGeneration(job: ContentGenerationJob) {
 
 export async function handleDailyPipeline(job: DailyPipelineJob) {
   await pipelineService.runDailyPipeline(job);
-}
-
-export async function handleVideoRendering(job: VideoRenderingJob) {
-  await pipelineService.renderVideo(job.contentId);
-}
-
-export async function handleYouTubeUpload(job: YouTubeUploadJob) {
-  await pipelineService.uploadToYouTube(job.contentId);
 }
 
 export async function handleAnalytics() {

@@ -1,6 +1,7 @@
 import type { LlmProvider } from '../interfaces';
 import type { TopicCandidate, Script, Scene, Character, ContentCategory } from '@kids-youtube/shared';
 import { CONTENT_CATEGORIES } from '@kids-youtube/shared';
+import { config } from '../../../config';
 import { logger } from '../../../utils/logger';
 
 const SAMPLE_TOPICS: Record<string, { title: string; description: string }[]> = {
@@ -155,9 +156,10 @@ See you on another learning day!`;
     const ellie = characters.find((c) => c.name === 'Ellie') || characters[1] || characters[0];
     const sunny = characters.find((c) => c.name === 'Sunny') || characters[2] || characters[0];
 
-    const sceneDuration = Math.floor(targetDuration / 5);
+    const sceneCount = config.freeTier ? 3 : 5;
+    const sceneDuration = Math.floor(targetDuration / sceneCount);
 
-    return [
+    const allScenes: Scene[] = [
       {
         sceneNumber: 1,
         title: 'Introduction',
@@ -233,6 +235,8 @@ See you on another learning day!`;
         visualPrompt: `${visualStyle}, characters waving goodbye, sunset, stars, warm farewell scene`,
       },
     ];
+
+    return allScenes.slice(0, sceneCount).map((s, i) => ({ ...s, sceneNumber: i + 1 }));
   }
 
   async generateShortScript(params: {

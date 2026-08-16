@@ -10,32 +10,42 @@ async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
 }
 
+/** PPM image — FFmpeg-compatible, no native deps */
+function createPpmBuffer(width: number, height: number, r: number, g: number, b: number): Buffer {
+  const header = Buffer.from(`P6\n${width} ${height}\n255\n`);
+  const pixels = Buffer.alloc(width * height * 3);
+  for (let i = 0; i < width * height; i++) {
+    pixels[i * 3] = r;
+    pixels[i * 3 + 1] = g;
+    pixels[i * 3 + 2] = b;
+  }
+  return Buffer.concat([header, pixels]);
+}
+
+const PALETTE: [number, number, number][] = [
+  [255, 107, 107], [78, 205, 196], [69, 183, 209], [150, 206, 180], [255, 234, 167],
+];
+
 export class MockImageProvider implements ImageProvider {
   name = 'mock';
 
   async generateImage(prompt: string, options?: { width?: number; height?: number }): Promise<string> {
     const dir = path.join(config.storagePath, 'images');
     await ensureDir(dir);
-    const filename = `${uuid()}.svg`;
+    const filename = `${uuid()}.ppm`;
     const filepath = path.join(dir, filename);
 
-    const w = options?.width || 1920;
-    const h = options?.height || 1080;
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'];
-    const bg = colors[Math.floor(Math.random() * colors.length)];
+    let w = options?.width || 1920;
+    let h = options?.height || 1080;
+    if (config.freeTier) {
+      w = Math.min(w, 854);
+      h = Math.min(h, 480);
+    }
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-      <rect width="100%" height="100%" fill="${bg}"/>
-      <circle cx="${w / 2}" cy="${h / 2 - 50}" r="120" fill="#FFF" opacity="0.9"/>
-      <text x="${w / 2}" y="${h / 2 + 150}" text-anchor="middle" font-family="Arial" font-size="32" fill="#333">
-        Kids Content Scene
-      </text>
-      <text x="${w / 2}" y="${h / 2 + 200}" text-anchor="middle" font-family="Arial" font-size="18" fill="#666">
-        ${prompt.substring(0, 60).replace(/[<>&]/g, '')}...
-      </text>
-    </svg>`;
-
-    await fs.writeFile(filepath, svg);
+    const [r, g, b] = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+    const buffer = createPpmBuffer(w, h, r, g, b);
+    await fs.writeFile(filepath, buffer);
+    logger.debug(`Generated PPM image ${w}x${h}: ${prompt.substring(0, 40)}...`);
     return `/storage/images/${filename}`;
   }
 

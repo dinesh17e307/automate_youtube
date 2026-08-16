@@ -1,0 +1,39 @@
+# Render FREE tier — $0/month (single service, no Redis, no Docker)
+# Deploy: Render Dashboard → New → Blueprint → connect repo
+# Use this file OR rename to render.yaml
+
+services:
+  - type: web
+    name: kids-youtube
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:free
+    startCommand: npm run start:free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FREE_TIER
+        value: "true"
+      - key: SERVE_FRONTEND
+        value: "true"
+      - key: INLINE_WORKER
+        value: "true"
+      - key: STORAGE_PATH
+        value: /opt/render/project/src/storage
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_REDIRECT_URI
+        sync: false

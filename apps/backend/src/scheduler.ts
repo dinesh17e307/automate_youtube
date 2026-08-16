@@ -1,31 +1,28 @@
-import cron from 'node-cron';
-import { dailyPipelineQueue, analyticsQueue } from './queues';
+import { enqueueJob, JOB_TYPES } from './queues';
 import { config } from './config';
 import { logger } from './utils/logger';
 
+/** Local dev scheduler — in production free tier, use HTTP cron instead */
 export function startScheduler() {
-  logger.info('Starting content scheduler...');
+  if (config.freeTier) {
+    logger.info('Free tier: use HTTP cron at /api/cron/* instead of node-cron');
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const cron = require('node-cron') as typeof import('node-cron');
+  logger.info('Starting content scheduler (node-cron)...');
 
   cron.schedule(config.cronDailyPipeline, async () => {
     const date = new Date().toISOString().split('T')[0];
     logger.info(`Triggering daily pipeline for ${date}`);
-
-    await dailyPipelineQueue.add('daily-pipeline', {
-      date,
-      contentType: 'both',
-    }, {
-      jobId: `daily-${date}`,
-    });
+    await enqueueJob(JOB_TYPES.DAILY_PIPELINE, { date, contentType: 'both' });
   });
 
   cron.schedule(config.cronAnalytics, async () => {
     logger.info('Triggering analytics collection');
-    await analyticsQueue.add('analytics-collect', {}, {
-      jobId: `analytics-${Date.now()}`,
-    });
+    await enqueueJob(JOB_TYPES.ANALYTICS, {});
   });
-
-  logger.info(`Scheduler active — pipeline: "${config.cronDailyPipeline}", analytics: "${config.cronAnalytics}"`);
 }
 
 if (require.main === module) {
