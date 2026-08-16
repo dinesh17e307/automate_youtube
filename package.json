@@ -1,0 +1,20 @@
+{
+  "name": "kids-youtube-automation",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @kids-youtube/backend\" \"npm run dev -w @kids-youtube/frontend\"",
+    "build": "npm run build -w @kids-youtube/shared && npm run build -w @kids-youtube/backend && npm run build -w @kids-youtube/frontend",
+    "db:migrate": "npm run db:migrate -w @kids-youtube/backend",
+    "db:generate": "npm run db:generate -w @kids-youtube/backend",
+    "worker": "npm run worker -w @kids-youtube/backend",
+    "scheduler": "npm run scheduler -w @kids-youtube/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ChannelConfig {
+  id                String   @id @default(uuid())
+  channelName       String   @default("Kids Learning Channel")
+  targetAge         String   @default("2-6")
+  contentCategories String[] @default(["nursery_rhymes", "kids_songs", "alphabet_learning", "animals", "colors"])
+  longVideoTime     String   @default("18:00")
+  shortVideoTime    String   @default("20:00")
+  videoDurationMin  Int      @default(120)
+  videoDurationMax  Int      @default(300)
+  visualStyle       String   @default("colorful cartoon, child-friendly, bright colors")
+  voiceStyle        String   @default("friendly, clear, child-appropriate")
+  language          String   @default("en")
+  automationMode    String   @default("fully_automatic")
+  llmProvider       String   @default("openai")
+  imageProvider     String   @default("openai")
+  videoProvider     String   @default("mock")
+  ttsProvider       String   @default("openai")
+  musicProvider     String   @default("mock")
+  youtubeChannelId  String?
+  youtubeTokens     Json?
+  timezone          String   @default("UTC")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Character {
+  id               String   @id @default(uuid())
+  name             String   @unique
+  description      String
+  appearance       String
+  clothing         String
+  colors           String
+  personality      String
+  referenceImageUrl String?
+  voiceId          String
+  voiceDescription String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  contentCharacters ContentCharacter[]
+}
+
+model Content {
+  id              String   @id @default(uuid())
+  type            String
+  title           String
+  category        String
+  status          String   @default("pending")
+  currentStage    String   @default("idea")
+  script          Json?
+  scenes          Json?
+  metadata        Json?
+  videoUrl        String?
+  thumbnailUrl    String?
+  audioUrl        String?
+  youtubeVideoId  String?
+  publishDate     DateTime?
+  scheduledAt     DateTime?
+  parentContentId String?
+  parentContent   Content? @relation("ContentToShort", fields: [parentContentId], references: [id])
+  shorts          Content[] @relation("ContentToShort")
+  errorMessage    String?
+  retryCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  characters      ContentCharacter[]
+  analytics       Analytics?
+  jobLogs         JobLog[]
+}
+
+model ContentCharacter {
+  id          String    @id @default(uuid())
+  contentId   String
+  characterId String
+  content     Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id])
+
+  @@unique([contentId, characterId])
+}
+
+model Analytics {
+  id                   String   @id @default(uuid())
+  contentId            String   @unique
+  content              Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  views                Int      @default(0)
+  watchTimeMinutes     Float    @default(0)
+  averageViewDuration  Float    @default(0)
+  impressions          Int      @default(0)
+  ctr                  Float    @default(0)
+  likes                Int      @default(0)
+  comments             Int      @default(0)
+  subscribersGained    Int      @default(0)
+  audienceRetention    Json?
+  collectedAt          DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model JobLog {
+  id        String   @id @default(uuid())
+  contentId String?
+  content   Content? @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  jobType   String
+  jobId     String?
+  status    String
+  message   String?
+  error     String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model TopicHistory {
+  id        String   @id @default(uuid())
+  title     String
+  category  String
+  usedAt    DateTime @default(now())
+  contentId String?
+  score     Float?
+}
