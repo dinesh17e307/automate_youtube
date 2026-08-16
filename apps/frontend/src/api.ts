@@ -47,6 +47,8 @@ export const api = {
     fetchApi<ChannelConfig>('/config', { method: 'PUT', body: JSON.stringify(data) }),
   getYouTubeStatus: () => fetchApi<YouTubeStatus>('/youtube/status'),
   getYouTubeAuth: () => fetchApi<{ authUrl: string }>('/youtube/auth'),
+  resetYouTubeThumbnailBlock: () =>
+    fetchApi<YouTubeStatus>('/youtube/thumbnails/reset-block', { method: 'POST' }),
   getCharacters: () => fetchApi<Character[]>('/youtube/characters'),
 };
 
@@ -133,10 +135,15 @@ export interface YouTubeStatus {
   redirectUri?: string;
   setupHint?: string;
   channelTitle?: string;
+  channelId?: string;
+  longUploadsStatus?: string;
   grantedScopes?: string[];
   hasThumbnailScope?: boolean;
   needsReauth?: boolean;
+  thumbnailEligibility?: 'eligible' | 'scope_missing' | 'channel_verification_required' | 'blocked';
+  skipCustomThumbnails?: boolean;
   customThumbnailsNote?: string;
+  verifyChannelUrl?: string;
   message?: string;
 }
 
@@ -160,11 +167,16 @@ export interface SystemStatus {
     configured: boolean;
     authenticated: boolean;
     channelTitle?: string;
+    channelId?: string;
+    longUploadsStatus?: string;
     hasThumbnailScope: boolean;
     needsReauth: boolean;
+    thumbnailEligibility: 'eligible' | 'scope_missing' | 'channel_verification_required' | 'blocked';
+    skipCustomThumbnails: boolean;
     status: 'ok' | 'warning' | 'not_configured' | 'not_connected';
     message: string;
     customThumbnailsNote: string;
+    verifyChannelUrl: string;
   };
   pipeline: {
     jobsPending: number;

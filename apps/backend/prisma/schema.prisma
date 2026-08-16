@@ -27,6 +27,7 @@ model ChannelConfig {
   musicProvider     String   @default("mock")
   youtubeChannelId  String?
   youtubeTokens     Json?
+  youtubeMeta       Json?
   timezone          String   @default("UTC")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

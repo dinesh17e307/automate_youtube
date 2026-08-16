@@ -25,11 +25,16 @@ export interface SystemStatus {
     configured: boolean;
     authenticated: boolean;
     channelTitle?: string;
+    channelId?: string;
+    longUploadsStatus?: string;
     hasThumbnailScope: boolean;
     needsReauth: boolean;
+    thumbnailEligibility: 'eligible' | 'scope_missing' | 'channel_verification_required' | 'blocked';
+    skipCustomThumbnails: boolean;
     status: 'ok' | 'warning' | 'not_configured' | 'not_connected';
     message: string;
     customThumbnailsNote: string;
+    verifyChannelUrl: string;
   };
   pipeline: {
     jobsPending: number;
@@ -205,9 +210,12 @@ async function checkYouTubeStatus(): Promise<SystemStatus['youtube']> {
       authenticated: false,
       hasThumbnailScope: false,
       needsReauth: false,
+      thumbnailEligibility: 'blocked',
+      skipCustomThumbnails: false,
       status: 'not_configured',
       message: 'YouTube API credentials not set on server',
       customThumbnailsNote: connection.customThumbnailsNote,
+      verifyChannelUrl: connection.verifyChannelUrl,
     };
   }
 
@@ -217,22 +225,48 @@ async function checkYouTubeStatus(): Promise<SystemStatus['youtube']> {
       authenticated: false,
       hasThumbnailScope: false,
       needsReauth: false,
+      thumbnailEligibility: 'blocked',
+      skipCustomThumbnails: false,
       status: 'not_connected',
       message: 'YouTube account not connected — uploads will be skipped',
       customThumbnailsNote: connection.customThumbnailsNote,
+      verifyChannelUrl: connection.verifyChannelUrl,
     };
   }
 
-  if (connection.needsReauth || !connection.hasThumbnailScope) {
+  if (connection.thumbnailEligibility === 'channel_verification_required') {
     return {
       configured: true,
       authenticated: true,
       channelTitle: connection.channelTitle,
+      channelId: connection.channelId,
+      longUploadsStatus: connection.longUploadsStatus,
+      hasThumbnailScope: connection.hasThumbnailScope,
+      needsReauth: connection.needsReauth,
+      thumbnailEligibility: connection.thumbnailEligibility,
+      skipCustomThumbnails: connection.skipCustomThumbnails,
+      status: 'warning',
+      message: connection.message || 'Channel must be phone-verified for custom thumbnails',
+      customThumbnailsNote: connection.customThumbnailsNote,
+      verifyChannelUrl: connection.verifyChannelUrl,
+    };
+  }
+
+  if (connection.needsReauth || connection.thumbnailEligibility === 'scope_missing') {
+    return {
+      configured: true,
+      authenticated: true,
+      channelTitle: connection.channelTitle,
+      channelId: connection.channelId,
+      longUploadsStatus: connection.longUploadsStatus,
       hasThumbnailScope: connection.hasThumbnailScope,
       needsReauth: true,
+      thumbnailEligibility: connection.thumbnailEligibility,
+      skipCustomThumbnails: connection.skipCustomThumbnails,
       status: 'warning',
       message: connection.message || 'Reconnect YouTube to grant custom thumbnail permissions',
       customThumbnailsNote: connection.customThumbnailsNote,
+      verifyChannelUrl: connection.verifyChannelUrl,
     };
   }
 
@@ -240,10 +274,15 @@ async function checkYouTubeStatus(): Promise<SystemStatus['youtube']> {
     configured: true,
     authenticated: true,
     channelTitle: connection.channelTitle,
-    hasThumbnailScope: true,
+    channelId: connection.channelId,
+    longUploadsStatus: connection.longUploadsStatus,
+    hasThumbnailScope: connection.hasThumbnailScope,
     needsReauth: false,
+    thumbnailEligibility: connection.thumbnailEligibility,
+    skipCustomThumbnails: connection.skipCustomThumbnails,
     status: 'ok',
     message: connection.message || `Connected as ${connection.channelTitle || 'your channel'}`,
     customThumbnailsNote: connection.customThumbnailsNote,
+    verifyChannelUrl: connection.verifyChannelUrl,
   };
 }

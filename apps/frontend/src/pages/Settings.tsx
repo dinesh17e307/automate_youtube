@@ -66,11 +66,21 @@ export default function Settings() {
   const handleYouTubeConnect = async () => {
     try {
       const { authUrl } = await api.getYouTubeAuth();
-      // Same-window redirect works better than popup for Google OAuth
       window.location.href = authUrl;
     } catch (err) {
       console.error(err);
       setYoutubeError(err instanceof Error ? err.message : 'Failed to start OAuth');
+    }
+  };
+
+  const handleRetryThumbnails = async () => {
+    try {
+      const status = await api.resetYouTubeThumbnailBlock();
+      setYoutubeStatus(status);
+      loadSystemStatus();
+    } catch (err) {
+      console.error(err);
+      setYoutubeError(err instanceof Error ? err.message : 'Failed to reset thumbnail block');
     }
   };
 
@@ -299,22 +309,63 @@ export default function Settings() {
 
           {youtubeStatus?.authenticated && (
             <div className={`p-4 border rounded-xl text-sm ${
-              youtubeStatus.hasThumbnailScope
+              youtubeStatus.thumbnailEligibility === 'eligible' && !youtubeStatus.skipCustomThumbnails
                 ? 'bg-green-50 border-green-200 text-green-800'
                 : 'bg-orange-50 border-orange-200 text-orange-800'
             }`}>
               <p className="font-bold">
-                {youtubeStatus.hasThumbnailScope
-                  ? '✅ Custom thumbnail permissions granted'
-                  : '⚠️ Custom thumbnail permissions missing'}
+                {youtubeStatus.thumbnailEligibility === 'eligible' && !youtubeStatus.skipCustomThumbnails
+                  ? '✅ Custom thumbnails enabled'
+                  : youtubeStatus.thumbnailEligibility === 'channel_verification_required'
+                    ? '⚠️ Channel verification required for custom thumbnails'
+                    : youtubeStatus.thumbnailEligibility === 'scope_missing'
+                      ? '⚠️ Reconnect YouTube for thumbnail permissions'
+                      : '⚠️ Custom thumbnails currently unavailable'}
               </p>
               <p className="text-xs mt-1">
                 {youtubeStatus.customThumbnailsNote}
               </p>
-              {!youtubeStatus.hasThumbnailScope && (
+
+              {youtubeStatus.thumbnailEligibility === 'channel_verification_required' && (
+                <div className="mt-3 space-y-2 text-xs">
+                  <p>
+                    Your video uploads are working. This error is from <strong>YouTube channel eligibility</strong>, not the app.
+                    YouTube blocks custom thumbnails until the channel is phone-verified.
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>
+                      Open{' '}
+                      <a href={youtubeStatus.verifyChannelUrl || 'https://www.youtube.com/verify'} target="_blank" rel="noreferrer" className="underline font-semibold">
+                        youtube.com/verify
+                      </a>{' '}
+                      while signed into the same Google account connected here
+                    </li>
+                    <li>Complete phone verification for channel <strong>{youtubeStatus.channelTitle || 'your channel'}</strong></li>
+                    <li>In YouTube Studio, open any video and confirm you can upload a custom thumbnail manually</li>
+                    <li>Click <strong>Retry thumbnails</strong> below after verification</li>
+                  </ol>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <a
+                      href={youtubeStatus.verifyChannelUrl || 'https://www.youtube.com/verify'}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 bg-orange-600 text-white font-bold rounded-lg hover:bg-orange-700"
+                    >
+                      Verify channel
+                    </a>
+                    <button
+                      onClick={handleRetryThumbnails}
+                      className="px-3 py-1.5 bg-white border border-orange-300 text-orange-800 font-bold rounded-lg hover:bg-orange-100"
+                    >
+                      Retry thumbnails
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {youtubeStatus.thumbnailEligibility === 'scope_missing' && (
                 <p className="text-xs mt-2">
                   Click <strong>Reconnect YouTube</strong> above and approve all requested permissions.
-                  Your channel must also be <a href="https://support.google.com/youtube/answer/171664?hl=en" target="_blank" rel="noreferrer" className="underline font-semibold">verified</a> to upload custom thumbnails.
                 </p>
               )}
             </div>

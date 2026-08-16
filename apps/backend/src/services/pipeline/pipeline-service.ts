@@ -480,8 +480,10 @@ export class PipelineService {
     });
 
     const uploadMessage = uploadResult.thumbnailError
-      ? `YouTube ID: ${uploadResult.videoId} (thumbnail skipped: ${uploadResult.thumbnailError})`
-      : `YouTube ID: ${uploadResult.videoId}${uploadResult.thumbnailSet ? ' with custom thumbnail' : ''}`;
+      ? `YouTube ID: ${uploadResult.videoId} (thumbnail failed: ${uploadResult.thumbnailError})`
+      : uploadResult.thumbnailSkipped
+        ? `YouTube ID: ${uploadResult.videoId} (thumbnail skipped: ${uploadResult.thumbnailSkipReason})`
+        : `YouTube ID: ${uploadResult.videoId}${uploadResult.thumbnailSet ? ' with custom thumbnail' : ''}`;
     await this.logJob(contentId, 'upload', 'completed', uploadMessage);
   }
 

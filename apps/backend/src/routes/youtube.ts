@@ -50,6 +50,17 @@ router.get('/status', async (_req: Request, res: Response) => {
   });
 });
 
+router.post('/thumbnails/reset-block', async (_req: Request, res: Response) => {
+  try {
+    await youtubeService.clearThumbnailBlock();
+    const status = await youtubeService.getConnectionStatus();
+    res.json(status);
+  } catch (error) {
+    logger.error('Failed to reset YouTube thumbnail block', error);
+    res.status(500).json({ error: 'Failed to reset thumbnail block' });
+  }
+});
+
 router.get('/characters', async (_req: Request, res: Response) => {
   const characters = await prisma.character.findMany({ orderBy: { name: 'asc' } });
   res.json(characters);
