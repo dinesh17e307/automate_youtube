@@ -88,13 +88,17 @@ npm run scheduler # Daily cron scheduler
 
 ## Deployment
 
-See **[DEPLOY.md](./DEPLOY.md)** for step-by-step hosting instructions.
+| Guide | Cost | Best for |
+|-------|------|----------|
+| **[DEPLOY-FREE.md](./DEPLOY-FREE.md)** | **$0** | Oracle Cloud VM, split free tier, local PC |
+| **[DEPLOY.md](./DEPLOY.md)** | ~$25/mo | Render managed hosting |
 
 | Platform | What to deploy |
 |----------|----------------|
-| **Render** (recommended) | Full stack via `render.yaml` — API, worker, DB, Redis, frontend |
-| **Vercel** | Frontend only (`apps/frontend`) — set `VITE_API_URL` to your Render API |
-| **Docker / VPS** | `docker build` + managed Postgres/Redis |
+| **Oracle Cloud** (free VM) | Full stack via `docker-compose.prod.yml` |
+| **Vercel + Fly.io + Neon + Upstash** | Split free tier |
+| **Render** | Full stack via `render.yaml` blueprint |
+| **Vercel** | Frontend only |
 
 ## Configuration
 
