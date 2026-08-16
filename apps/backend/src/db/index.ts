@@ -29,6 +29,7 @@ export async function ensureDefaultConfig() {
       data: {
         videoDurationMin: Math.min(existing.videoDurationMin, config.defaultVideoDurationMin),
         videoDurationMax: Math.min(existing.videoDurationMax, config.defaultVideoDurationMax),
+        publishMode: existing.publishMode || 'immediate',
       },
     });
   }
