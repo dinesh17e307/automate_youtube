@@ -461,7 +461,7 @@ export class PipelineService {
       scheduledAt.setDate(scheduledAt.getDate() + 1);
     }
 
-    const youtubeVideoId = await youtubeService.uploadVideo(
+    const uploadResult = await youtubeService.uploadVideo(
       content.videoUrl!,
       content.thumbnailUrl,
       metadata,
@@ -471,7 +471,7 @@ export class PipelineService {
     await prisma.content.update({
       where: { id: contentId },
       data: {
-        youtubeVideoId,
+        youtubeVideoId: uploadResult.videoId,
         status: 'scheduled',
         scheduledAt,
         publishDate: scheduledAt,
@@ -479,7 +479,10 @@ export class PipelineService {
       },
     });
 
-    await this.logJob(contentId, 'upload', 'completed', `YouTube ID: ${youtubeVideoId}`);
+    const uploadMessage = uploadResult.thumbnailError
+      ? `YouTube ID: ${uploadResult.videoId} (thumbnail skipped: ${uploadResult.thumbnailError})`
+      : `YouTube ID: ${uploadResult.videoId}${uploadResult.thumbnailSet ? ' with custom thumbnail' : ''}`;
+    await this.logJob(contentId, 'upload', 'completed', uploadMessage);
   }
 
   async approveContent(contentId: string): Promise<void> {

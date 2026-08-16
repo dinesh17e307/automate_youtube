@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type ChannelConfig, type SystemStatus } from '../api';
+import { api, type ChannelConfig, type SystemStatus, type YouTubeStatus } from '../api';
 
 const CATEGORIES = [
   'nursery_rhymes', 'kids_songs', 'educational_rhymes', 'alphabet_learning',
@@ -13,12 +13,7 @@ export default function Settings() {
   const [config, setConfig] = useState<ChannelConfig | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [youtubeStatus, setYoutubeStatus] = useState<{
-    configured: boolean;
-    authenticated: boolean;
-    redirectUri?: string;
-    setupHint?: string;
-  } | null>(null);
+  const [youtubeStatus, setYoutubeStatus] = useState<YouTubeStatus | null>(null);
 
   const [youtubeError, setYoutubeError] = useState<string | null>(null);
   const [youtubeConnected, setYoutubeConnected] = useState(false);
@@ -104,6 +99,21 @@ export default function Settings() {
             <p className="text-sm text-gray-400">Checking status...</p>
           ) : systemStatus ? (
             <div className="space-y-4">
+              {/* YouTube */}
+              <StatusCard
+                title="YouTube"
+                status={
+                  systemStatus.youtube.status === 'ok' ? 'ok'
+                    : systemStatus.youtube.status === 'warning' ? 'error'
+                    : systemStatus.youtube.status === 'not_connected' ? 'not_configured'
+                    : 'not_configured'
+                }
+                message={systemStatus.youtube.message}
+                detail={systemStatus.youtube.customThumbnailsNote}
+                link="https://studio.youtube.com/channel/UC/features"
+                linkLabel="Verify channel for custom thumbnails"
+              />
+
               {/* OpenAI */}
               <StatusCard
                 title="OpenAI API"
@@ -262,22 +272,53 @@ export default function Settings() {
             <div>
               <p className="font-semibold text-gray-700 text-sm">
                 {youtubeStatus?.authenticated ? '✅ Connected' : '❌ Not Connected'}
+                {youtubeStatus?.channelTitle ? ` — ${youtubeStatus.channelTitle}` : ''}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                {youtubeStatus?.configured
-                  ? 'YouTube API credentials configured'
-                  : 'Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET on Render'}
+                {youtubeStatus?.message || (
+                  youtubeStatus?.configured
+                    ? 'YouTube API credentials configured'
+                    : 'Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET on Render'
+                )}
               </p>
+              {youtubeStatus?.authenticated && youtubeStatus.needsReauth && (
+                <p className="text-xs text-orange-600 mt-1 font-semibold">
+                  Reconnect required for custom thumbnail permissions
+                </p>
+              )}
             </div>
-            {youtubeStatus?.configured && !youtubeStatus.authenticated && (
+            {youtubeStatus?.configured && (
               <button
                 onClick={handleYouTubeConnect}
                 className="px-4 py-2 bg-red-500 text-white font-bold rounded-xl text-sm hover:bg-red-600 transition-colors"
               >
-                Connect YouTube
+                {youtubeStatus.authenticated ? 'Reconnect YouTube' : 'Connect YouTube'}
               </button>
             )}
           </div>
+
+          {youtubeStatus?.authenticated && (
+            <div className={`p-4 border rounded-xl text-sm ${
+              youtubeStatus.hasThumbnailScope
+                ? 'bg-green-50 border-green-200 text-green-800'
+                : 'bg-orange-50 border-orange-200 text-orange-800'
+            }`}>
+              <p className="font-bold">
+                {youtubeStatus.hasThumbnailScope
+                  ? '✅ Custom thumbnail permissions granted'
+                  : '⚠️ Custom thumbnail permissions missing'}
+              </p>
+              <p className="text-xs mt-1">
+                {youtubeStatus.customThumbnailsNote}
+              </p>
+              {!youtubeStatus.hasThumbnailScope && (
+                <p className="text-xs mt-2">
+                  Click <strong>Reconnect YouTube</strong> above and approve all requested permissions.
+                  Your channel must also be <a href="https://support.google.com/youtube/answer/171664?hl=en" target="_blank" rel="noreferrer" className="underline font-semibold">verified</a> to upload custom thumbnails.
+                </p>
+              )}
+            </div>
+          )}
 
           {youtubeStatus?.redirectUri && !youtubeStatus.authenticated && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm">

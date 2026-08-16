@@ -3,6 +3,7 @@ import { prisma } from '../db';
 import { config } from '../config';
 import { getQueueStats } from '../queues';
 import { logger } from '../utils/logger';
+import { youtubeService } from './youtube/youtube-service';
 
 export interface SystemStatus {
   hosting: {
@@ -19,6 +20,16 @@ export interface SystemStatus {
     message: string;
     limitsNote: string;
     usageUrl: string;
+  };
+  youtube: {
+    configured: boolean;
+    authenticated: boolean;
+    channelTitle?: string;
+    hasThumbnailScope: boolean;
+    needsReauth: boolean;
+    status: 'ok' | 'warning' | 'not_configured' | 'not_connected';
+    message: string;
+    customThumbnailsNote: string;
   };
   pipeline: {
     jobsPending: number;
@@ -41,6 +52,7 @@ export async function getSystemStatus(): Promise<SystemStatus> {
   const llmProvider = channelConfig?.llmProvider || 'mock';
 
   const openaiStatus = await checkOpenAiStatus(llmProvider);
+  const youtubeStatus = await checkYouTubeStatus();
   const queueStats = await getQueueStats();
   const q = queueStats[0] || { waiting: 0, active: 0, failed: 0 };
 
@@ -83,6 +95,10 @@ export async function getSystemStatus(): Promise<SystemStatus> {
     whyStuck.push(`${q.failed} background job(s) failed — check recent errors below`);
   }
 
+  if (youtubeStatus.status === 'warning') {
+    whyStuck.push(`YouTube: ${youtubeStatus.message}`);
+  }
+
   return {
     hosting: {
       freeTier: config.freeTier,
@@ -94,6 +110,7 @@ export async function getSystemStatus(): Promise<SystemStatus> {
       cronConfigured: !!config.cronSecret,
     },
     openai: openaiStatus,
+    youtube: youtubeStatus,
     pipeline: {
       jobsPending: q.waiting,
       jobsProcessing: q.active,
@@ -177,4 +194,56 @@ async function checkOpenAiStatus(activeProvider: string): Promise<SystemStatus['
       usageUrl,
     };
   }
+}
+
+async function checkYouTubeStatus(): Promise<SystemStatus['youtube']> {
+  const connection = await youtubeService.getConnectionStatus();
+
+  if (!connection.configured) {
+    return {
+      configured: false,
+      authenticated: false,
+      hasThumbnailScope: false,
+      needsReauth: false,
+      status: 'not_configured',
+      message: 'YouTube API credentials not set on server',
+      customThumbnailsNote: connection.customThumbnailsNote,
+    };
+  }
+
+  if (!connection.authenticated) {
+    return {
+      configured: true,
+      authenticated: false,
+      hasThumbnailScope: false,
+      needsReauth: false,
+      status: 'not_connected',
+      message: 'YouTube account not connected — uploads will be skipped',
+      customThumbnailsNote: connection.customThumbnailsNote,
+    };
+  }
+
+  if (connection.needsReauth || !connection.hasThumbnailScope) {
+    return {
+      configured: true,
+      authenticated: true,
+      channelTitle: connection.channelTitle,
+      hasThumbnailScope: connection.hasThumbnailScope,
+      needsReauth: true,
+      status: 'warning',
+      message: connection.message || 'Reconnect YouTube to grant custom thumbnail permissions',
+      customThumbnailsNote: connection.customThumbnailsNote,
+    };
+  }
+
+  return {
+    configured: true,
+    authenticated: true,
+    channelTitle: connection.channelTitle,
+    hasThumbnailScope: true,
+    needsReauth: false,
+    status: 'ok',
+    message: connection.message || `Connected as ${connection.channelTitle || 'your channel'}`,
+    customThumbnailsNote: connection.customThumbnailsNote,
+  };
 }

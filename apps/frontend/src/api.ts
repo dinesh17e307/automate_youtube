@@ -45,7 +45,7 @@ export const api = {
   getSystemStatus: () => fetchApi<SystemStatus>('/config/system-status'),
   updateConfig: (data: Partial<ChannelConfig>) =>
     fetchApi<ChannelConfig>('/config', { method: 'PUT', body: JSON.stringify(data) }),
-  getYouTubeStatus: () => fetchApi<{ configured: boolean; authenticated: boolean; redirectUri?: string; setupHint?: string }>('/youtube/status'),
+  getYouTubeStatus: () => fetchApi<YouTubeStatus>('/youtube/status'),
   getYouTubeAuth: () => fetchApi<{ authUrl: string }>('/youtube/auth'),
   getCharacters: () => fetchApi<Character[]>('/youtube/characters'),
 };
@@ -127,6 +127,19 @@ export interface Character {
   voiceDescription: string;
 }
 
+export interface YouTubeStatus {
+  configured: boolean;
+  authenticated: boolean;
+  redirectUri?: string;
+  setupHint?: string;
+  channelTitle?: string;
+  grantedScopes?: string[];
+  hasThumbnailScope?: boolean;
+  needsReauth?: boolean;
+  customThumbnailsNote?: string;
+  message?: string;
+}
+
 export interface SystemStatus {
   hosting: {
     freeTier: boolean;
@@ -142,6 +155,16 @@ export interface SystemStatus {
     message: string;
     limitsNote: string;
     usageUrl: string;
+  };
+  youtube: {
+    configured: boolean;
+    authenticated: boolean;
+    channelTitle?: string;
+    hasThumbnailScope: boolean;
+    needsReauth: boolean;
+    status: 'ok' | 'warning' | 'not_configured' | 'not_connected';
+    message: string;
+    customThumbnailsNote: string;
   };
   pipeline: {
     jobsPending: number;

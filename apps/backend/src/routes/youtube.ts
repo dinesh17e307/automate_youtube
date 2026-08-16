@@ -43,11 +43,9 @@ router.get('/callback', async (req: Request, res: Response) => {
 });
 
 router.get('/status', async (_req: Request, res: Response) => {
-  const isAuthenticated = await youtubeService.isAuthenticated();
+  const status = await youtubeService.getConnectionStatus();
   res.json({
-    configured: youtubeService.isConfigured(),
-    authenticated: isAuthenticated,
-    redirectUri: config.youtubeRedirectUri,
+    ...status,
     setupHint: 'Add redirectUri to Google Cloud Console → APIs & Services → Credentials → OAuth client → Authorized redirect URIs',
   });
 });

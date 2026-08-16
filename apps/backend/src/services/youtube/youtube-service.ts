@@ -6,11 +6,60 @@ import { config } from '../../config';
 import { logger } from '../../utils/logger';
 import type { ContentMetadata } from '@kids-youtube/shared';
 
+export const YOUTUBE_OAUTH_SCOPES = [
+  'https://www.googleapis.com/auth/youtube.upload',
+  'https://www.googleapis.com/auth/youtube.force-ssl',
+] as const;
+
+const THUMBNAIL_SCOPES = new Set([
+  'https://www.googleapis.com/auth/youtube.force-ssl',
+  'https://www.googleapis.com/auth/youtube',
+]);
+
+export interface YouTubeUploadResult {
+  videoId: string;
+  thumbnailSet: boolean;
+  thumbnailError?: string;
+}
+
+export interface YouTubeConnectionStatus {
+  configured: boolean;
+  authenticated: boolean;
+  redirectUri: string;
+  channelTitle?: string;
+  grantedScopes: string[];
+  hasThumbnailScope: boolean;
+  needsReauth: boolean;
+  customThumbnailsNote: string;
+  message?: string;
+}
+
 function resolveStoragePath(urlPath: string): string {
   if (urlPath.startsWith('/storage/')) {
     return path.join(config.storagePath, urlPath.replace('/storage/', ''));
   }
   return urlPath;
+}
+
+function parseGrantedScopes(tokens: Record<string, unknown> | null | undefined): string[] {
+  const scope = tokens?.scope;
+  if (typeof scope !== 'string' || !scope.trim()) {
+    return [];
+  }
+  return scope.split(/\s+/).filter(Boolean);
+}
+
+function hasThumbnailScope(scopes: string[]): boolean {
+  return scopes.some((scope) => THUMBNAIL_SCOPES.has(scope));
+}
+
+function formatYouTubeError(error: unknown): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as { response?: { data?: { error?: { message?: string } } } }).response;
+    const message = response?.data?.error?.message;
+    if (message) return message;
+  }
+  return error instanceof Error ? error.message : 'Unknown YouTube API error';
 }
 
 export class YouTubeService {
@@ -27,10 +76,7 @@ export class YouTubeService {
   getAuthUrl(): string {
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
-      scope: [
-        'https://www.googleapis.com/auth/youtube.upload',
-        'https://www.googleapis.com/auth/youtube.readonly',
-      ],
+      scope: [...YOUTUBE_OAUTH_SCOPES],
       prompt: 'consent',
       include_granted_scopes: true,
     });
@@ -46,7 +92,9 @@ export class YouTubeService {
       });
     }
     this.oauth2Client.setCredentials(tokens);
-    logger.info('YouTube OAuth tokens saved');
+    logger.info('YouTube OAuth tokens saved', {
+      scopes: parseGrantedScopes(tokens as Record<string, unknown>),
+    });
   }
 
   private async getAuthenticatedClient() {
@@ -58,12 +106,91 @@ export class YouTubeService {
     return this.oauth2Client;
   }
 
+  async getConnectionStatus(): Promise<YouTubeConnectionStatus> {
+    const redirectUri = config.youtubeRedirectUri;
+    const configured = this.isConfigured();
+    const authenticated = await this.isAuthenticated();
+
+    const customThumbnailsNote =
+      'Custom thumbnails require the youtube.force-ssl OAuth scope and a verified YouTube channel. ' +
+      'If uploads fail on thumbnails, reconnect YouTube and verify your channel at studio.youtube.com.';
+
+    if (!configured) {
+      return {
+        configured: false,
+        authenticated: false,
+        redirectUri,
+        grantedScopes: [],
+        hasThumbnailScope: false,
+        needsReauth: false,
+        customThumbnailsNote,
+        message: 'Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET on the server.',
+      };
+    }
+
+    if (!authenticated) {
+      return {
+        configured: true,
+        authenticated: false,
+        redirectUri,
+        grantedScopes: [],
+        hasThumbnailScope: false,
+        needsReauth: false,
+        customThumbnailsNote,
+        message: 'Connect your YouTube account to enable uploads.',
+      };
+    }
+
+    const channelConfig = await prisma.channelConfig.findFirst();
+    const grantedScopes = parseGrantedScopes(channelConfig?.youtubeTokens as Record<string, unknown>);
+    const thumbnailScopeGranted = hasThumbnailScope(grantedScopes);
+    const needsReauth = grantedScopes.length === 0 || !thumbnailScopeGranted;
+
+    try {
+      const auth = await this.getAuthenticatedClient();
+      const youtube = google.youtube({ version: 'v3', auth });
+      const response = await youtube.channels.list({
+        part: ['snippet'],
+        mine: true,
+      });
+      const channelTitle = response.data.items?.[0]?.snippet?.title || undefined;
+
+      return {
+        configured: true,
+        authenticated: true,
+        redirectUri,
+        channelTitle,
+        grantedScopes,
+        hasThumbnailScope: thumbnailScopeGranted,
+        needsReauth,
+        customThumbnailsNote,
+        message: needsReauth
+          ? 'Reconnect YouTube to grant thumbnail permissions (youtube.force-ssl scope).'
+          : thumbnailScopeGranted
+            ? `Connected as ${channelTitle || 'your channel'}.`
+            : 'Connected, but thumbnail scope is missing — reconnect YouTube.',
+      };
+    } catch (error) {
+      logger.warn('YouTube connection status check failed', { error: formatYouTubeError(error) });
+      return {
+        configured: true,
+        authenticated: true,
+        redirectUri,
+        grantedScopes,
+        hasThumbnailScope: thumbnailScopeGranted,
+        needsReauth: true,
+        customThumbnailsNote,
+        message: `Connected, but YouTube API check failed: ${formatYouTubeError(error)}. Try reconnecting.`,
+      };
+    }
+  }
+
   async uploadVideo(
     videoPath: string,
     thumbnailPath: string | null,
     metadata: ContentMetadata,
     scheduledAt?: Date
-  ): Promise<string> {
+  ): Promise<YouTubeUploadResult> {
     const auth = await this.getAuthenticatedClient();
     const youtube = google.youtube({ version: 'v3', auth });
 
@@ -101,18 +228,27 @@ export class YouTubeService {
     const videoId = response.data.id;
     if (!videoId) throw new Error('YouTube upload failed: no video ID returned');
 
+    let thumbnailSet = false;
+    let thumbnailError: string | undefined;
+
     if (thumbnailPath) {
       const resolvedThumb = resolveStoragePath(thumbnailPath);
       if (fs.existsSync(resolvedThumb)) {
-        await youtube.thumbnails.set({
-          videoId,
-          media: { body: fs.createReadStream(resolvedThumb) },
-        });
+        try {
+          await youtube.thumbnails.set({
+            videoId,
+            media: { body: fs.createReadStream(resolvedThumb) },
+          });
+          thumbnailSet = true;
+        } catch (error) {
+          thumbnailError = formatYouTubeError(error);
+          logger.warn(`Video ${videoId} uploaded but custom thumbnail failed: ${thumbnailError}`);
+        }
       }
     }
 
-    logger.info(`Video uploaded to YouTube: ${videoId}`);
-    return videoId;
+    logger.info(`Video uploaded to YouTube: ${videoId}`, { thumbnailSet, thumbnailError });
+    return { videoId, thumbnailSet, thumbnailError };
   }
 
   async getAnalytics(videoId: string) {
