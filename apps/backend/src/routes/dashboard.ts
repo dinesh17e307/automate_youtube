@@ -182,6 +182,34 @@ router.post('/content/:id/retry', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/content/:id/sync-publish', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const content = await prisma.content.findUnique({ where: { id } });
+    if (!content) return res.status(404).json({ error: 'Content not found' });
+
+    if (content.status === 'scheduled' && content.scheduledAt && content.scheduledAt <= new Date()) {
+      await prisma.content.update({
+        where: { id },
+        data: { status: 'published', currentStage: 'published', publishDate: new Date() },
+      });
+      return res.json({ message: 'Marked as published', status: 'published' });
+    }
+
+    if (content.status === 'scheduled') {
+      return res.json({
+        message: 'Still scheduled on YouTube',
+        status: 'scheduled',
+        scheduledAt: content.scheduledAt,
+      });
+    }
+
+    res.json({ message: 'No sync needed', status: content.status });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to sync publish status' });
+  }
+});
+
 router.post('/pipeline/trigger', async (_req: Request, res: Response) => {
   try {
     const date = new Date().toISOString().split('T')[0];

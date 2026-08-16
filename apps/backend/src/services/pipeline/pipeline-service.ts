@@ -9,6 +9,23 @@ import type { Script, Scene, Character, ContentMetadata, ContentCategory } from 
 import { CONTENT_CATEGORIES } from '@kids-youtube/shared';
 import type { ContentGenerationJob, DailyPipelineJob } from '../../queues';
 
+function shouldPublishImmediately(publishMode: string): boolean {
+  return config.freeTier || publishMode === 'immediate';
+}
+
+function computeScheduledPublishAt(contentType: 'long' | 'short', longVideoTime: string, shortVideoTime: string): Date {
+  const [hours, minutes] = (contentType === 'short' ? shortVideoTime : longVideoTime)
+    .split(':')
+    .map(Number);
+
+  const scheduledAt = new Date();
+  scheduledAt.setUTCHours(hours, minutes, 0, 0);
+  if (scheduledAt <= new Date()) {
+    scheduledAt.setDate(scheduledAt.getDate() + 1);
+  }
+  return scheduledAt;
+}
+
 export class PipelineService {
   async runDailyPipeline(job: DailyPipelineJob): Promise<void> {
     const date = job.date || new Date().toISOString().split('T')[0];
@@ -450,16 +467,14 @@ export class PipelineService {
       visibility: 'public',
     };
 
-    const [hours, minutes] = (content.type === 'short'
-      ? channelConfig.shortVideoTime
-      : channelConfig.longVideoTime
-    ).split(':').map(Number);
-
-    const scheduledAt = new Date();
-    scheduledAt.setUTCHours(hours, minutes, 0, 0);
-    if (scheduledAt <= new Date()) {
-      scheduledAt.setDate(scheduledAt.getDate() + 1);
-    }
+    const publishImmediately = shouldPublishImmediately(channelConfig.publishMode);
+    const scheduledAt = publishImmediately
+      ? undefined
+      : computeScheduledPublishAt(
+        content.type as 'long' | 'short',
+        channelConfig.longVideoTime,
+        channelConfig.shortVideoTime
+      );
 
     const uploadResult = await youtubeService.uploadVideo(
       content.videoUrl!,
@@ -468,15 +483,24 @@ export class PipelineService {
       scheduledAt
     );
 
+    const now = new Date();
     await prisma.content.update({
       where: { id: contentId },
-      data: {
-        youtubeVideoId: uploadResult.videoId,
-        status: 'scheduled',
-        scheduledAt,
-        publishDate: scheduledAt,
-        currentStage: 'published',
-      },
+      data: publishImmediately
+        ? {
+            youtubeVideoId: uploadResult.videoId,
+            status: 'published',
+            scheduledAt: null,
+            publishDate: now,
+            currentStage: 'published',
+          }
+        : {
+            youtubeVideoId: uploadResult.videoId,
+            status: 'scheduled',
+            scheduledAt,
+            publishDate: scheduledAt,
+            currentStage: 'uploaded',
+          },
     });
 
     const uploadMessage = uploadResult.thumbnailError
@@ -568,7 +592,43 @@ export async function handleDailyPipeline(job: DailyPipelineJob) {
   await pipelineService.runDailyPipeline(job);
 }
 
+export async function syncScheduledPublications(): Promise<number> {
+  const now = new Date();
+
+  const due = await prisma.content.updateMany({
+    where: {
+      status: 'scheduled',
+      scheduledAt: { lte: now },
+      youtubeVideoId: { not: null },
+    },
+    data: {
+      status: 'published',
+      currentStage: 'published',
+      publishDate: now,
+    },
+  });
+
+  // Fix UI state for videos still waiting on YouTube publish time
+  await prisma.content.updateMany({
+    where: {
+      status: 'scheduled',
+      scheduledAt: { gt: now },
+      currentStage: 'published',
+    },
+    data: {
+      currentStage: 'uploaded',
+    },
+  });
+
+  if (due.count > 0) {
+    logger.info(`Marked ${due.count} scheduled video(s) as published`);
+  }
+
+  return due.count;
+}
+
 export async function handleAnalytics() {
+  await syncScheduledPublications();
   const published = await prisma.content.findMany({
     where: { youtubeVideoId: { not: null }, status: { in: ['scheduled', 'published'] } },
     include: { analytics: true },

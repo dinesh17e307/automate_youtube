@@ -161,7 +161,7 @@ function TodayCard({ label, content, icon }: {
             {content.title}
           </Link>
           <div className="mt-3">
-            <PipelineProgress currentStage={content.currentStage} />
+            <PipelineProgress currentStage={content.currentStage} status={content.status} />
           </div>
         </div>
       ) : (

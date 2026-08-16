@@ -39,6 +39,8 @@ export const api = {
     fetchApi(`/dashboard/content/${id}/regenerate/${stage}`, { method: 'POST' }),
   retryContent: (id: string) =>
     fetchApi(`/dashboard/content/${id}/retry`, { method: 'POST' }),
+  syncPublishStatus: (id: string) =>
+    fetchApi<{ message: string; status: string; scheduledAt?: string }>(`/dashboard/content/${id}/sync-publish`, { method: 'POST' }),
   triggerPipeline: () =>
     fetchApi('/dashboard/pipeline/trigger', { method: 'POST' }),
   getConfig: () => fetchApi<ChannelConfig>('/config'),
@@ -108,6 +110,7 @@ export interface ChannelConfig {
   voiceStyle: string;
   language: string;
   automationMode: string;
+  publishMode: string;
   llmProvider: string;
   imageProvider: string;
   ttsProvider: string;

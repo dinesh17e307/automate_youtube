@@ -88,7 +88,26 @@ export default function ContentDetailPage() {
 
         <div className="mt-6">
           <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Pipeline Progress</h3>
-          <PipelineProgress currentStage={content.currentStage} />
+          <PipelineProgress currentStage={content.currentStage} status={content.status} />
+          {content.status === 'scheduled' && content.scheduledAt && (
+            <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800">
+              <p className="font-bold">Uploaded to YouTube — waiting to go live</p>
+              <p className="text-xs mt-1">
+                Scheduled for {new Date(content.scheduledAt).toLocaleString()} UTC
+                {content.youtubeVideoId && (
+                  <> · <a href={`https://youtube.com/watch?v=${content.youtubeVideoId}`} target="_blank" rel="noreferrer" className="underline font-semibold">View on YouTube (private until publish)</a></>
+                )}
+              </p>
+            </div>
+          )}
+          {content.status === 'published' && content.youtubeVideoId && (
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
+              <p className="font-bold">Live on YouTube</p>
+              <a href={`https://youtube.com/watch?v=${content.youtubeVideoId}`} target="_blank" rel="noreferrer" className="text-xs underline font-semibold">
+                youtube.com/watch?v={content.youtubeVideoId}
+              </a>
+            </div>
+          )}
           {content.errorMessage && (
             <p className="mt-3 text-sm text-red-600 bg-red-50 p-3 rounded-xl">{content.errorMessage}</p>
           )}
@@ -115,6 +134,25 @@ export default function ContentDetailPage() {
               className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50"
             >
               ↻ Retry Rendering
+            </button>
+          )}
+          {content.status === 'scheduled' && (
+            <button
+              onClick={async () => {
+                setActionLoading(true);
+                try {
+                  await api.syncPublishStatus(content.id);
+                  load();
+                } catch (err) {
+                  console.error(err);
+                } finally {
+                  setActionLoading(false);
+                }
+              }}
+              disabled={actionLoading}
+              className="px-5 py-2.5 bg-purple-500 text-white font-bold rounded-xl hover:bg-purple-600 transition-colors disabled:opacity-50"
+            >
+              ↻ Check publish status
             </button>
           )}
           {content.status === 'awaiting_approval' && (

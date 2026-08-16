@@ -20,6 +20,7 @@ model ChannelConfig {
   voiceStyle        String   @default("friendly, clear, child-appropriate")
   language          String   @default("en")
   automationMode    String   @default("fully_automatic")
+  publishMode       String   @default("immediate")
   llmProvider       String   @default("openai")
   imageProvider     String   @default("openai")
   videoProvider     String   @default("mock")

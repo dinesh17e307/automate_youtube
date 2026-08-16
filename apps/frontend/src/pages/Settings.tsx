@@ -209,6 +209,16 @@ export default function Settings() {
             <Field label="Long Video Time (UTC)" value={config.longVideoTime} onChange={(v) => setConfig({ ...config, longVideoTime: v })} placeholder="18:00" />
             <Field label="Short Time (UTC)" value={config.shortVideoTime} onChange={(v) => setConfig({ ...config, shortVideoTime: v })} placeholder="20:00" />
           </div>
+          <SelectField
+            label="YouTube Publish Mode"
+            value={config.publishMode || 'immediate'}
+            options={['immediate', 'scheduled']}
+            onChange={(v) => setConfig({ ...config, publishMode: v })}
+          />
+          <p className="text-xs text-gray-400">
+            <strong>immediate</strong> — video goes public on YouTube right after upload.
+            <strong> scheduled</strong> — uploads as private and publishes at the times above.
+          </p>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Min Duration (sec)" value={String(config.videoDurationMin)} onChange={(v) => setConfig({ ...config, videoDurationMin: parseInt(v) || 120 })} type="number" />
             <Field label="Max Duration (sec)" value={String(config.videoDurationMax)} onChange={(v) => setConfig({ ...config, videoDurationMax: parseInt(v) || 300 })} type="number" />

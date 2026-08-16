@@ -17,15 +17,17 @@ const STAGE_LABELS: Record<string, string> = {
   published: 'Published',
 };
 
-export function PipelineProgress({ currentStage }: { currentStage: string }) {
+export function PipelineProgress({ currentStage, status }: { currentStage: string; status?: string }) {
   const currentIndex = STAGE_ORDER.indexOf(currentStage);
+  const isPipelineComplete = status === 'published' || status === 'scheduled' || status === 'awaiting_approval';
 
   return (
     <div className="flex items-center gap-1 overflow-x-auto py-2">
       {STAGE_ORDER.map((stage, i) => {
-        const isComplete = i < currentIndex;
-        const isCurrent = stage === currentStage;
-        const isPending = i > currentIndex;
+        const isComplete = isPipelineComplete ? i <= currentIndex : i < currentIndex;
+        const isCurrent = !isPipelineComplete && stage === currentStage;
+        const isWaitingPublish = status === 'scheduled' && stage === 'published';
+        const isPending = !isComplete && !isCurrent && !isWaitingPublish;
 
         return (
           <div key={stage} className="flex items-center">
@@ -34,19 +36,27 @@ export function PipelineProgress({ currentStage }: { currentStage: string }) {
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   isComplete
                     ? 'bg-green-500 text-white'
+                    : isWaitingPublish
+                    ? 'bg-purple-500 text-white ring-4 ring-purple-200'
                     : isCurrent
                     ? 'bg-blue-500 text-white ring-4 ring-blue-200 animate-pulse'
                     : 'bg-gray-200 text-gray-400'
                 }`}
               >
-                {isComplete ? '✓' : i + 1}
+                {isComplete ? '✓' : isWaitingPublish ? '⏳' : i + 1}
               </div>
               <span
                 className={`text-[10px] mt-1 font-semibold ${
-                  isCurrent ? 'text-blue-600' : isPending ? 'text-gray-400' : 'text-green-600'
+                  isWaitingPublish
+                    ? 'text-purple-600'
+                    : isCurrent
+                    ? 'text-blue-600'
+                    : isPending
+                    ? 'text-gray-400'
+                    : 'text-green-600'
                 }`}
               >
-                {STAGE_LABELS[stage]}
+                {isWaitingPublish ? 'Scheduled' : STAGE_LABELS[stage]}
               </span>
             </div>
             {i < STAGE_ORDER.length - 1 && (

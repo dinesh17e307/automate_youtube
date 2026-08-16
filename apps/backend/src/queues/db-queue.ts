@@ -6,6 +6,7 @@ import {
   handleDailyPipeline,
   handleContentGeneration,
   handleAnalytics,
+  syncScheduledPublications,
 } from '../services/pipeline/pipeline-service';
 
 export const JOB_TYPES = {
@@ -89,6 +90,7 @@ export async function processPendingJobs(): Promise<number> {
 
   try {
     await resetStuckJobs();
+    await syncScheduledPublications();
 
     while (true) {
       const job = await prisma.pipelineJob.findFirst({

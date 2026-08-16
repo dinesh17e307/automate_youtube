@@ -39,7 +39,7 @@ router.put('/', async (req: Request, res: Response) => {
     const allowedFields = [
       'channelName', 'targetAge', 'contentCategories', 'longVideoTime',
       'shortVideoTime', 'videoDurationMin', 'videoDurationMax',
-      'visualStyle', 'voiceStyle', 'language', 'automationMode',
+      'visualStyle', 'voiceStyle', 'language', 'automationMode', 'publishMode',
       'llmProvider', 'imageProvider', 'videoProvider', 'ttsProvider',
       'musicProvider', 'timezone',
     ];
