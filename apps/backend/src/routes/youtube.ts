@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { config } from '../config';
+import { logger } from '../utils/logger';
 import { youtubeService } from '../services/youtube/youtube-service';
 
 const router = Router();
@@ -12,19 +13,32 @@ router.get('/auth', (_req: Request, res: Response) => {
     });
   }
   const url = youtubeService.getAuthUrl();
-  res.json({ authUrl: url });
+  res.json({
+    authUrl: url,
+    redirectUri: config.youtubeRedirectUri,
+    clientId: config.youtubeClientId,
+  });
 });
 
 router.get('/callback', async (req: Request, res: Response) => {
+  const { code, error, error_description } = req.query;
+
+  if (error) {
+    const msg = encodeURIComponent(String(error_description || error));
+    logger.warn('YouTube OAuth denied', { error, error_description });
+    return res.redirect(`/settings?youtube=error&message=${msg}`);
+  }
+
   try {
-    const { code } = req.query;
     if (!code || typeof code !== 'string') {
-      return res.status(400).json({ error: 'Authorization code required' });
+      return res.redirect('/settings?youtube=error&message=No+authorization+code+received');
     }
     await youtubeService.handleCallback(code);
-    res.redirect('/?youtube=connected');
-  } catch (error) {
-    res.status(500).json({ error: 'YouTube authentication failed' });
+    res.redirect('/settings?youtube=connected');
+  } catch (err) {
+    const msg = encodeURIComponent(err instanceof Error ? err.message : 'Authentication failed');
+    logger.error('YouTube OAuth callback failed', err);
+    res.redirect(`/settings?youtube=error&message=${msg}`);
   }
 });
 

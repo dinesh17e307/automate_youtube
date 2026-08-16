@@ -19,9 +19,23 @@ export default function Settings() {
     setupHint?: string;
   } | null>(null);
 
+  const [youtubeError, setYoutubeError] = useState<string | null>(null);
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
+
   useEffect(() => {
     api.getConfig().then(setConfig).catch(console.error);
     api.getYouTubeStatus().then(setYoutubeStatus).catch(console.error);
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('youtube') === 'connected') {
+      setYoutubeConnected(true);
+      api.getYouTubeStatus().then(setYoutubeStatus).catch(console.error);
+      window.history.replaceState({}, '', '/settings');
+    }
+    if (params.get('youtube') === 'error') {
+      setYoutubeError(decodeURIComponent(params.get('message') || 'Connection failed'));
+      window.history.replaceState({}, '', '/settings');
+    }
   }, []);
 
   const handleSave = async () => {
@@ -42,9 +56,11 @@ export default function Settings() {
   const handleYouTubeConnect = async () => {
     try {
       const { authUrl } = await api.getYouTubeAuth();
-      window.open(authUrl, '_blank');
+      // Same-window redirect works better than popup for Google OAuth
+      window.location.href = authUrl;
     } catch (err) {
       console.error(err);
+      setYoutubeError(err instanceof Error ? err.message : 'Failed to start OAuth');
     }
   };
 
@@ -136,6 +152,18 @@ export default function Settings() {
         </Section>
 
         <Section title="YouTube Integration">
+          {youtubeConnected && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 font-semibold">
+              ✅ YouTube connected successfully!
+            </div>
+          )}
+          {youtubeError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              <p className="font-bold">Connection failed</p>
+              <p className="mt-1 text-xs">{youtubeError}</p>
+            </div>
+          )}
+
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
             <div>
               <p className="font-semibold text-gray-700 text-sm">
@@ -157,22 +185,33 @@ export default function Settings() {
             )}
           </div>
 
-          {youtubeStatus?.redirectUri && (
+          {youtubeStatus?.redirectUri && !youtubeStatus.authenticated && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm">
-              <p className="font-bold text-yellow-800 mb-2">Google Cloud setup required</p>
+              <p className="font-bold text-yellow-800 mb-2">Google Cloud Console checklist</p>
               <p className="text-yellow-700 text-xs mb-2">
-                Add this <strong>exact</strong> redirect URI in Google Cloud Console:
+                Your OAuth client must be type <strong>Web application</strong> (not Desktop).
+                Add these <strong>exact</strong> values:
               </p>
-              <code className="block bg-white p-2 rounded text-xs break-all text-gray-800 border">
+
+              <p className="text-xs font-semibold text-yellow-800 mt-3">Authorized redirect URI:</p>
+              <code className="block bg-white p-2 rounded text-xs break-all text-gray-800 border mt-1">
                 {youtubeStatus.redirectUri}
               </code>
-              <ol className="text-xs text-yellow-700 mt-3 space-y-1 list-decimal list-inside">
-                <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="underline">Google Cloud Credentials</a></li>
-                <li>Open your OAuth 2.0 Client ID</li>
-                <li>Under <strong>Authorized redirect URIs</strong>, click Add URI and paste the URL above</li>
-                <li>Enable <strong>YouTube Data API v3</strong> in the API Library</li>
-                <li>Add your Google account as a <strong>Test user</strong> on the OAuth consent screen (if app is in Testing mode)</li>
-                <li>Save, wait 1–2 minutes, then click Connect YouTube again</li>
+
+              <p className="text-xs font-semibold text-yellow-800 mt-3">Authorized JavaScript origin:</p>
+              <code className="block bg-white p-2 rounded text-xs break-all text-gray-800 border mt-1">
+                {youtubeStatus.redirectUri.replace('/api/youtube/callback', '')}
+              </code>
+
+              <ol className="text-xs text-yellow-700 mt-3 space-y-1.5 list-decimal list-inside">
+                <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="underline font-semibold">Google Cloud Credentials</a></li>
+                <li>Click your OAuth 2.0 Client ID (Web application)</li>
+                <li>Paste the redirect URI and JavaScript origin above → <strong>Save</strong></li>
+                <li>Enable <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noreferrer" className="underline">YouTube Data API v3</a></li>
+                <li>Go to <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noreferrer" className="underline">OAuth consent screen</a></li>
+                <li>If status is <strong>Testing</strong>: add your Gmail under <strong>Test users</strong></li>
+                <li>Wait 2 minutes, then click Connect YouTube</li>
+                <li>If you see &quot;Google hasn&apos;t verified this app&quot; → click <strong>Advanced</strong> → <strong>Go to KidsTube (unsafe)</strong></li>
               </ol>
             </div>
           )}
