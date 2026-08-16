@@ -1,0 +1,9 @@
+{
+  "buildCommand": "cd ../.. && npm ci && npm run build -w @kids-youtube/shared && npm run build -w @kids-youtube/frontend",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "cd ../.. && npm ci",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

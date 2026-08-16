@@ -52,7 +52,7 @@ router.post('/characters', async (req: Request, res: Response) => {
 router.put('/characters/:id', async (req: Request, res: Response) => {
   try {
     const character = await prisma.character.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: req.body,
     });
     res.json(character);

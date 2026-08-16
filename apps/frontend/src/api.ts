@@ -1,4 +1,12 @@
-const API_BASE = '/api';
+export const API_ORIGIN = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api` : '/api';
+
+/** Resolve storage/media paths when frontend is hosted separately from the API */
+export function assetUrl(path?: string | null): string {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return API_ORIGIN ? `${API_ORIGIN}${path}` : path;
+}
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

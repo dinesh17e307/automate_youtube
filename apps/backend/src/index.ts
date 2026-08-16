@@ -11,7 +11,10 @@ import youtubeRoutes from './routes/youtube';
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: config.corsOrigin || true,
+  credentials: true,
+}));
 app.use(express.json());
 
 const storageDir = config.storagePath;

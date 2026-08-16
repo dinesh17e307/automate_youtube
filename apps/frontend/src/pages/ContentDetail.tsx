@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api, type ContentDetail } from '../api';
+import { api, assetUrl, type ContentDetail } from '../api';
 import { PipelineProgress, StatusBadge } from '../components/ui';
 
 export default function ContentDetailPage() {
@@ -118,14 +118,14 @@ export default function ContentDetailPage() {
         {content.thumbnailUrl && (
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <h3 className="font-bold text-gray-800 mb-3">Thumbnail</h3>
-            <img src={content.thumbnailUrl} alt="Thumbnail" className="rounded-xl w-full" />
+            <img src={assetUrl(content.thumbnailUrl)} alt="Thumbnail" className="rounded-xl w-full" />
           </div>
         )}
 
         {content.videoUrl && (
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <h3 className="font-bold text-gray-800 mb-3">Video Preview</h3>
-            <video src={content.videoUrl} controls className="rounded-xl w-full" />
+            <video src={assetUrl(content.videoUrl)} controls className="rounded-xl w-full" />
           </div>
         )}
       </div>

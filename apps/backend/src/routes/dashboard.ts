@@ -118,7 +118,7 @@ router.get('/content', async (req: Request, res: Response) => {
 router.get('/content/:id', async (req: Request, res: Response) => {
   try {
     const content = await prisma.content.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         analytics: true,
         characters: { include: { character: true } },

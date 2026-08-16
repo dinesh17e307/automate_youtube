@@ -86,6 +86,16 @@ npm run scheduler # Daily cron scheduler
 - **API**: http://localhost:3001
 - **Health check**: http://localhost:3001/api/health
 
+## Deployment
+
+See **[DEPLOY.md](./DEPLOY.md)** for step-by-step hosting instructions.
+
+| Platform | What to deploy |
+|----------|----------------|
+| **Render** (recommended) | Full stack via `render.yaml` — API, worker, DB, Redis, frontend |
+| **Vercel** | Frontend only (`apps/frontend`) — set `VITE_API_URL` to your Render API |
+| **Docker / VPS** | `docker build` + managed Postgres/Redis |
+
 ## Configuration
 
 All settings are configurable from the admin dashboard (Settings page) or via environment variables:

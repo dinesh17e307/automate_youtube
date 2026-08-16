@@ -171,7 +171,7 @@ export class PipelineService {
       let longScript: Script | undefined;
       if (content.parentContentId) {
         const parent = await prisma.content.findUnique({ where: { id: content.parentContentId } });
-        longScript = parent?.script as Script | undefined;
+        longScript = parent?.script as unknown as Script | undefined;
       }
       script = await providers.llm.generateShortScript({
         longScript,
@@ -202,7 +202,7 @@ export class PipelineService {
     const providers = await getAiProviders();
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
     const channelConfig = await prisma.channelConfig.findFirstOrThrow();
-    const script = content.script as Script;
+    const script = content.script as unknown as Script;
 
     const dbCharacters = await prisma.character.findMany();
     const characters: Character[] = dbCharacters.map((c: {
@@ -244,7 +244,7 @@ export class PipelineService {
     const providers = await getAiProviders();
     const channelConfig = await prisma.channelConfig.findFirstOrThrow();
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
-    const scenes = content.scenes as Scene[];
+    const scenes = content.scenes as unknown as Scene[];
 
     const characterNames = new Set<string>();
     for (const scene of scenes) {
@@ -295,7 +295,7 @@ export class PipelineService {
     await this.updateStage(contentId, 'voice');
     const providers = await getAiProviders();
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
-    const scenes = content.scenes as Scene[];
+    const scenes = content.scenes as unknown as Scene[];
 
     const voiceFiles: string[] = [];
     for (const scene of scenes) {
@@ -321,8 +321,8 @@ export class PipelineService {
     await this.updateStage(contentId, 'music');
     const providers = await getAiProviders();
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
-    const script = content.script as Script;
-    const scenes = content.scenes as Scene[];
+    const script = content.script as unknown as Script;
+    const scenes = content.scenes as unknown as Scene[];
 
     const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
     const musicUrl = await providers.music.generateBackgroundMusic(
@@ -343,8 +343,8 @@ export class PipelineService {
     const providers = await getAiProviders();
     const channelConfig = await prisma.channelConfig.findFirstOrThrow();
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
-    const scenes = content.scenes as (Scene & { audioUrl?: string })[];
-    const script = content.script as Script;
+    const scenes = content.scenes as unknown as (Scene & { audioUrl?: string })[];
+    const script = content.script as unknown as Script;
 
     const sceneImages: string[] = [];
     for (const scene of scenes) {
@@ -377,8 +377,8 @@ export class PipelineService {
   async generateThumbnail(contentId: string): Promise<void> {
     await this.updateStage(contentId, 'thumbnail');
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
-    const script = content.script as Script;
-    const scenes = content.scenes as Scene[];
+    const script = content.script as unknown as Script;
+    const scenes = content.scenes as unknown as Scene[];
 
     const providers = await getAiProviders();
     const thumbImage = await providers.image.generateImage(
@@ -403,8 +403,8 @@ export class PipelineService {
   async validateContent(contentId: string): Promise<void> {
     await this.updateStage(contentId, 'validation');
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
-    const script = content.script as Script;
-    const scenes = content.scenes as Scene[];
+    const script = content.script as unknown as Script;
+    const scenes = content.scenes as unknown as Scene[];
 
     const result = await contentValidator.validate(script, scenes);
 
@@ -419,7 +419,7 @@ export class PipelineService {
   async uploadToYouTube(contentId: string): Promise<void> {
     await this.updateStage(contentId, 'uploaded');
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
-    const script = content.script as Script;
+    const script = content.script as unknown as Script;
     const channelConfig = await prisma.channelConfig.findFirstOrThrow();
 
     const isAuthenticated = await youtubeService.isAuthenticated();

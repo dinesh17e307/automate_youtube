@@ -13,6 +13,8 @@ import {
   handleYouTubeUpload,
   handleAnalytics,
 } from './services/pipeline/pipeline-service';
+import { startScheduler } from './scheduler';
+import { config } from './config';
 import { logger } from './utils/logger';
 import type { Job } from 'bullmq';
 
@@ -40,6 +42,11 @@ export function startWorkers() {
   });
 
   logger.info('All workers started');
+
+  if (config.startScheduler) {
+    startScheduler();
+    logger.info('Scheduler started inside worker process');
+  }
 }
 
 if (require.main === module) {

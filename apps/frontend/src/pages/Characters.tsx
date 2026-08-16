@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type Character } from '../api';
+import { api, assetUrl, type Character } from '../api';
 
 export default function Characters() {
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -28,7 +28,7 @@ export default function Characters() {
           <div key={char.id} className="bg-white rounded-2xl shadow-lg overflow-hidden">
             <div className="h-40 bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center">
               {char.referenceImageUrl ? (
-                <img src={char.referenceImageUrl} alt={char.name} className="h-full w-full object-cover" />
+                <img src={assetUrl(char.referenceImageUrl)} alt={char.name} className="h-full w-full object-cover" />
               ) : (
                 <span className="text-6xl">
                   {char.name === 'Bunny' ? '🐰' : char.name === 'Ellie' ? '🐘' : '☀️'}
