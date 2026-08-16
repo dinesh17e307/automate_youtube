@@ -89,9 +89,34 @@ export default function ContentDetailPage() {
         <div className="mt-6">
           <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Pipeline Progress</h3>
           <PipelineProgress currentStage={content.currentStage} />
+          {content.errorMessage && (
+            <p className="mt-3 text-sm text-red-600 bg-red-50 p-3 rounded-xl">{content.errorMessage}</p>
+          )}
+          {content.status === 'generating' && content.currentStage === 'rendering' && (
+            <p className="mt-2 text-xs text-gray-400">Rendering can take 2–5 minutes on free tier. If stuck over 10 min, click Retry Rendering.</p>
+          )}
         </div>
 
         <div className="mt-6 flex gap-3 flex-wrap">
+          {(content.status === 'failed' || (content.status === 'generating' && content.currentStage === 'rendering')) && (
+            <button
+              onClick={async () => {
+                setActionLoading(true);
+                try {
+                  await api.retryContent(content.id);
+                  setTimeout(load, 2000);
+                } catch (err) {
+                  console.error(err);
+                } finally {
+                  setActionLoading(false);
+                }
+              }}
+              disabled={actionLoading}
+              className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50"
+            >
+              ↻ Retry Rendering
+            </button>
+          )}
           {content.status === 'awaiting_approval' && (
             <button
               onClick={handleApprove}

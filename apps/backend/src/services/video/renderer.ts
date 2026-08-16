@@ -16,6 +16,8 @@ interface RenderOptions {
   outputDir?: string;
 }
 
+const FFMPEG_TIMEOUT_MS = config.freeTier ? 120_000 : 300_000;
+
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
 }
@@ -28,23 +30,29 @@ function resolveStoragePath(urlPath: string): string {
 }
 
 function getDimensions(format: 'long' | 'short') {
-  return format === 'short'
-    ? { width: 1080, height: 1920 }
-    : { width: 1920, height: 1080 };
+  if (config.freeTier) {
+    return format === 'short' ? { width: 480, height: 854 } : { width: 854, height: 480 };
+  }
+  return format === 'short' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 };
 }
 
-function escapeDrawtext(text: string): string {
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "'\\''")
-    .replace(/:/g, '\\:')
-    .replace(/%/g, '\\%')
-    .substring(0, 80);
+function runFfmpeg(command: ffmpeg.FfmpegCommand, label: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      try { command.kill('SIGKILL'); } catch { /* ignore */ }
+      reject(new Error(`FFmpeg timeout after ${FFMPEG_TIMEOUT_MS / 1000}s (${label})`));
+    }, FFMPEG_TIMEOUT_MS);
+
+    command
+      .on('end', () => { clearTimeout(timer); resolve(); })
+      .on('error', (err) => { clearTimeout(timer); reject(err); })
+      .run();
+  });
 }
 
 export async function renderVideo(options: RenderOptions): Promise<string> {
   initFfmpeg();
-  const { scenes, sceneImages, voiceFiles, musicFile, script, format } = options;
+  const { scenes, sceneImages, voiceFiles, musicFile, format } = options;
   const { width, height } = getDimensions(format);
   const outputDir = options.outputDir || path.join(config.storagePath, 'videos');
   await ensureDir(outputDir);
@@ -54,6 +62,8 @@ export async function renderVideo(options: RenderOptions): Promise<string> {
   const tempDir = path.join(config.storagePath, 'temp', uuid());
   await ensureDir(tempDir);
 
+  logger.info(`Rendering ${scenes.length} scenes at ${width}x${height} (freeTier=${config.freeTier})`);
+
   try {
     const segmentPaths: string[] = [];
 
@@ -62,35 +72,36 @@ export async function renderVideo(options: RenderOptions): Promise<string> {
       const imagePath = resolveStoragePath(sceneImages[i] || sceneImages[0]);
       const voicePath = voiceFiles[i] ? resolveStoragePath(voiceFiles[i]) : null;
       const segmentPath = path.join(tempDir, `segment_${i}.mp4`);
-      const duration = scene.durationSeconds;
+      const duration = Math.min(scene.durationSeconds, config.freeTier ? 20 : scene.durationSeconds);
 
-      const subtitle = escapeDrawtext(scene.dialogue);
+      // Free tier: skip drawtext — requires fonts not available on Render
+      const videoFilters = [
+        `scale=${width}:${height}:force_original_aspect_ratio=decrease`,
+        `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=0x87CEEB`,
+      ];
 
-      await new Promise<void>((resolve, reject) => {
-        let cmd = ffmpeg(imagePath)
-          .inputOptions(['-loop 1'])
-          .duration(duration)
-          .videoFilters([
-            `scale=${width}:${height}:force_original_aspect_ratio=decrease`,
-            `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=0x87CEEB`,
-            `drawtext=text='${subtitle}':fontsize=${format === 'short' ? 36 : 28}:fontcolor=white:borderw=3:bordercolor=black:x=(w-text_w)/2:y=h-120`,
-          ])
-          .outputOptions(['-c:v libx264', '-tune stillimage', '-pix_fmt yuv420p', '-r 30']);
+      let cmd = ffmpeg(imagePath)
+        .inputOptions(['-loop 1'])
+        .duration(duration)
+        .videoFilters(videoFilters)
+        .outputOptions([
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-tune', 'stillimage',
+          '-pix_fmt', 'yuv420p',
+          '-r', '24',
+        ]);
 
-        if (voicePath) {
-          cmd = cmd.input(voicePath).outputOptions(['-c:a aac', '-b:a 128k', '-shortest']);
-        } else {
-          cmd = cmd.outputOptions(['-an']);
-        }
+      if (voicePath) {
+        cmd = cmd.input(voicePath).outputOptions(['-c:a', 'aac', '-b:a', '96k', '-shortest']);
+      } else {
+        cmd = cmd.outputOptions(['-an']);
+      }
 
-        cmd
-          .output(segmentPath)
-          .on('end', () => resolve())
-          .on('error', (err) => reject(err))
-          .run();
-      });
-
+      cmd.output(segmentPath);
+      await runFfmpeg(cmd, `segment ${i + 1}/${scenes.length}`);
       segmentPaths.push(segmentPath);
+      logger.info(`Rendered segment ${i + 1}/${scenes.length}`);
     }
 
     const concatListPath = path.join(tempDir, 'concat.txt');
@@ -99,35 +110,31 @@ export async function renderVideo(options: RenderOptions): Promise<string> {
 
     const concatPath = path.join(tempDir, 'concatenated.mp4');
 
-    await new Promise<void>((resolve, reject) => {
-      ffmpeg()
-        .input(concatListPath)
-        .inputOptions(['-f concat', '-safe 0'])
-        .outputOptions(['-c copy'])
-        .output(concatPath)
-        .on('end', () => resolve())
-        .on('error', (err) => reject(err))
-        .run();
-    });
+    const concatCmd = ffmpeg()
+      .input(concatListPath)
+      .inputOptions(['-f', 'concat', '-safe', '0'])
+      .outputOptions(['-c', 'copy'])
+      .output(concatPath);
+
+    await runFfmpeg(concatCmd, 'concat');
 
     if (musicFile) {
       const musicPath = resolveStoragePath(musicFile);
-      await new Promise<void>((resolve, reject) => {
-        ffmpeg()
+      try {
+        const mixCmd = ffmpeg()
           .input(concatPath)
           .input(musicPath)
           .complexFilter([
-            '[1:a]volume=0.15[music]',
+            '[1:a]volume=0.12[music]',
             '[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]',
           ])
-          .outputOptions(['-map 0:v', '-map [aout]', '-c:v copy', '-c:a aac', '-shortest'])
-          .output(outputPath)
-          .on('end', () => resolve())
-          .on('error', () => {
-            fs.copyFile(concatPath, outputPath).then(() => resolve()).catch(reject);
-          })
-          .run();
-      });
+          .outputOptions(['-map', '0:v', '-map', '[aout]', '-c:v', 'copy', '-c:a', 'aac', '-shortest'])
+          .output(outputPath);
+        await runFfmpeg(mixCmd, 'music mix');
+      } catch {
+        logger.warn('Music mix failed, using video without background music');
+        await fs.copyFile(concatPath, outputPath);
+      }
     } else {
       await fs.copyFile(concatPath, outputPath);
     }
@@ -152,21 +159,15 @@ export async function generateThumbnail(
   const filename = `thumb_${uuid()}.jpg`;
   const outputPath = path.join(outputDir, filename);
   const resolvedImage = resolveStoragePath(imagePath);
-  const shortTitle = escapeDrawtext(title.split('|')[0].trim().substring(0, 30));
 
-  await new Promise<void>((resolve, reject) => {
-    ffmpeg(resolvedImage)
-      .videoFilters([
-        `scale=${width}:${height}:force_original_aspect_ratio=increase`,
-        `crop=${width}:${height}`,
-        `drawtext=text='${shortTitle}':fontsize=${format === 'short' ? 48 : 56}:fontcolor=yellow:borderw=4:bordercolor=black:x=(w-text_w)/2:y=80`,
-      ])
-      .outputOptions(['-frames:v 1', '-q:v 2'])
-      .output(outputPath)
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
-      .run();
-  });
+  const thumbCmd = ffmpeg(resolvedImage)
+    .videoFilters([
+      `scale=${width}:${height}:force_original_aspect_ratio=increase`,
+      `crop=${width}:${height}`,
+    ])
+    .outputOptions(['-frames:v', '1', '-q:v', '5'])
+    .output(outputPath);
 
+  await runFfmpeg(thumbCmd, 'thumbnail');
   return `/storage/thumbnails/${filename}`;
 }

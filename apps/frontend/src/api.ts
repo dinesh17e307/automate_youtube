@@ -37,6 +37,8 @@ export const api = {
     fetchApi(`/dashboard/content/${id}/approve`, { method: 'POST' }),
   regenerateStage: (id: string, stage: string) =>
     fetchApi(`/dashboard/content/${id}/regenerate/${stage}`, { method: 'POST' }),
+  retryContent: (id: string) =>
+    fetchApi(`/dashboard/content/${id}/retry`, { method: 'POST' }),
   triggerPipeline: () =>
     fetchApi('/dashboard/pipeline/trigger', { method: 'POST' }),
   getConfig: () => fetchApi<ChannelConfig>('/config'),
@@ -63,6 +65,7 @@ export interface ContentItem {
 }
 
 export interface ContentDetail extends ContentItem {
+  errorMessage?: string;
   script?: Record<string, unknown>;
   scenes?: Record<string, unknown>[];
   jobLogs?: { jobType: string; status: string; message?: string; createdAt: string }[];

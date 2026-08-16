@@ -164,6 +164,24 @@ router.post('/content/:id/regenerate/:stage', async (req: Request, res: Response
   }
 });
 
+router.post('/content/:id/retry', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const content = await prisma.content.findUnique({ where: { id } });
+    if (!content) return res.status(404).json({ error: 'Content not found' });
+
+    await prisma.content.update({
+      where: { id },
+      data: { status: 'generating', errorMessage: null, currentStage: 'rendering' },
+    });
+
+    await enqueueJob(JOB_TYPES.CONTENT_GENERATION, { contentId: id, stage: 'rendering' });
+    res.json({ message: 'Retry queued' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retry content' });
+  }
+});
+
 router.post('/pipeline/trigger', async (_req: Request, res: Response) => {
   try {
     const date = new Date().toISOString().split('T')[0];

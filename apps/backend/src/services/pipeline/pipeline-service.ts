@@ -341,24 +341,33 @@ export class PipelineService {
   async renderVideo(contentId: string): Promise<void> {
     await this.updateStage(contentId, 'rendering');
     const providers = await getAiProviders();
-    const channelConfig = await prisma.channelConfig.findFirstOrThrow();
     const content = await prisma.content.findUniqueOrThrow({ where: { id: contentId } });
     const scenes = content.scenes as unknown as (Scene & { audioUrl?: string })[];
     const script = content.script as unknown as Script;
 
+    // Cap scene count and duration on free tier
+    const maxScenes = config.freeTier ? 3 : scenes.length;
+    const renderScenes = scenes.slice(0, maxScenes).map((s) => ({
+      ...s,
+      durationSeconds: config.freeTier ? Math.min(s.durationSeconds, 15) : s.durationSeconds,
+    }));
+
     const sceneImages: string[] = [];
-    for (const scene of scenes) {
+    for (const scene of renderScenes) {
+      const size = content.type === 'short'
+        ? { width: 480, height: 854 }
+        : { width: 854, height: 480 };
       const imageUrl = await providers.image.generateImage(
         scene.visualPrompt,
-        content.type === 'short' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 }
+        config.freeTier ? size : (content.type === 'short' ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 })
       );
       sceneImages.push(imageUrl);
     }
 
-    const voiceFiles = scenes.map((s) => s.audioUrl || '');
+    const voiceFiles = renderScenes.map((s) => s.audioUrl || '');
 
     const videoUrl = await renderVideo({
-      scenes,
+      scenes: renderScenes,
       sceneImages,
       voiceFiles,
       musicFile: content.audioUrl || undefined,
@@ -477,12 +486,38 @@ export class PipelineService {
     await this.uploadToYouTube(contentId);
   }
 
+  async resumeFromRendering(contentId: string): Promise<void> {
+    try {
+      await prisma.content.update({
+        where: { id: contentId },
+        data: { status: 'generating', errorMessage: null },
+      });
+      await this.renderVideo(contentId);
+      await this.generateThumbnail(contentId);
+      await this.validateContent(contentId);
+      const channelConfig = await prisma.channelConfig.findFirst();
+      if (channelConfig?.automationMode === 'approval') {
+        await this.updateStage(contentId, 'validation', 'awaiting_approval');
+      } else {
+        await this.uploadToYouTube(contentId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await prisma.content.update({
+        where: { id: contentId },
+        data: { status: 'failed', errorMessage: message, retryCount: { increment: 1 } },
+      });
+      throw error;
+    }
+  }
+
   async regenerateStage(contentId: string, stage: string): Promise<void> {
     const stageHandlers: Record<string, () => Promise<void>> = {
       script: () => this.generateScript(contentId),
       scenes: () => this.generateScenes(contentId),
       characters: () => this.generateCharacters(contentId),
       voice: () => this.generateVoice(contentId),
+      rendering: () => this.renderVideo(contentId),
       thumbnail: () => this.generateThumbnail(contentId),
     };
 
@@ -517,6 +552,10 @@ export class PipelineService {
 export const pipelineService = new PipelineService();
 
 export async function handleContentGeneration(job: ContentGenerationJob) {
+  if (job.stage === 'rendering') {
+    await pipelineService.resumeFromRendering(job.contentId);
+    return;
+  }
   await pipelineService.processContent(job.contentId);
 }
 

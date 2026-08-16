@@ -136,11 +136,33 @@ export async function processPendingJobs(): Promise<number> {
 }
 
 async function resetStuckJobs() {
-  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+
   await prisma.pipelineJob.updateMany({
-    where: { status: 'processing', startedAt: { lt: thirtyMinAgo } },
+    where: { status: 'processing', startedAt: { lt: tenMinAgo } },
     data: { status: 'pending' },
   });
+
+  // Mark content stuck at rendering as failed so UI doesn't hang forever
+  const stuckContent = await prisma.content.findMany({
+    where: {
+      status: 'generating',
+      currentStage: 'rendering',
+      updatedAt: { lt: tenMinAgo },
+      videoUrl: null,
+    },
+  });
+
+  for (const content of stuckContent) {
+    await prisma.content.update({
+      where: { id: content.id },
+      data: {
+        status: 'failed',
+        errorMessage: 'Rendering timed out — retry from the content page. On free tier, keep videos under 90 seconds.',
+      },
+    });
+    logger.warn(`Marked stuck content as failed: ${content.id}`);
+  }
 }
 
 export function startInlineWorker() {
