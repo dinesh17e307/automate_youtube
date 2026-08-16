@@ -1,9 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { clearProviderCache } from '../services/ai/factory';
+import { getSystemStatus } from '../services/system-status';
 import { logger } from '../utils/logger';
 
 const router = Router();
+
+router.get('/system-status', async (_req: Request, res: Response) => {
+  try {
+    const status = await getSystemStatus();
+    res.json(status);
+  } catch (error) {
+    logger.error('System status error', error);
+    res.status(500).json({ error: 'Failed to fetch system status' });
+  }
+});
 
 router.get('/', async (_req: Request, res: Response) => {
   try {

@@ -42,6 +42,7 @@ export const api = {
   triggerPipeline: () =>
     fetchApi('/dashboard/pipeline/trigger', { method: 'POST' }),
   getConfig: () => fetchApi<ChannelConfig>('/config'),
+  getSystemStatus: () => fetchApi<SystemStatus>('/config/system-status'),
   updateConfig: (data: Partial<ChannelConfig>) =>
     fetchApi<ChannelConfig>('/config', { method: 'PUT', body: JSON.stringify(data) }),
   getYouTubeStatus: () => fetchApi<{ configured: boolean; authenticated: boolean; redirectUri?: string; setupHint?: string }>('/youtube/status'),
@@ -124,4 +125,36 @@ export interface Character {
   referenceImageUrl?: string;
   voiceId: string;
   voiceDescription: string;
+}
+
+export interface SystemStatus {
+  hosting: {
+    freeTier: boolean;
+    environment: string;
+    memoryLimit: string;
+    storageNote: string;
+    cronConfigured: boolean;
+  };
+  openai: {
+    configured: boolean;
+    activeProvider: string;
+    status: 'ok' | 'error' | 'not_configured' | 'mock';
+    message: string;
+    limitsNote: string;
+    usageUrl: string;
+  };
+  pipeline: {
+    jobsPending: number;
+    jobsProcessing: number;
+    jobsFailed: number;
+    stuckRendering: number;
+    recentErrors: { contentId: string; title: string; error: string; stage: string }[];
+  };
+  freeTierLimits: {
+    maxVideoSeconds: number;
+    maxScenes: number;
+    renderResolution: string;
+    renderTimeoutSeconds: number;
+    whyStuck: string[];
+  };
 }

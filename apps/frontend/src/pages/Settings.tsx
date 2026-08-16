@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, type ChannelConfig } from '../api';
+import { Link } from 'react-router-dom';
+import { api, type ChannelConfig, type SystemStatus } from '../api';
 
 const CATEGORIES = [
   'nursery_rhymes', 'kids_songs', 'educational_rhymes', 'alphabet_learning',
@@ -21,10 +22,22 @@ export default function Settings() {
 
   const [youtubeError, setYoutubeError] = useState<string | null>(null);
   const [youtubeConnected, setYoutubeConnected] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+
+  const loadSystemStatus = () => {
+    setStatusLoading(true);
+    api.getSystemStatus()
+      .then(setSystemStatus)
+      .catch(console.error)
+      .finally(() => setStatusLoading(false));
+  };
 
   useEffect(() => {
     api.getConfig().then(setConfig).catch(console.error);
     api.getYouTubeStatus().then(setYoutubeStatus).catch(console.error);
+    loadSystemStatus();
+    const interval = setInterval(loadSystemStatus, 30000);
 
     const params = new URLSearchParams(window.location.search);
     if (params.get('youtube') === 'connected') {
@@ -36,6 +49,8 @@ export default function Settings() {
       setYoutubeError(decodeURIComponent(params.get('message') || 'Connection failed'));
       window.history.replaceState({}, '', '/settings');
     }
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleSave = async () => {
@@ -84,6 +99,85 @@ export default function Settings() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
+        <Section title="System Status & Limits">
+          {statusLoading && !systemStatus ? (
+            <p className="text-sm text-gray-400">Checking status...</p>
+          ) : systemStatus ? (
+            <div className="space-y-4">
+              {/* OpenAI */}
+              <StatusCard
+                title="OpenAI API"
+                status={systemStatus.openai.status}
+                message={systemStatus.openai.message}
+                detail={systemStatus.openai.limitsNote}
+                link={systemStatus.openai.usageUrl}
+                linkLabel="View OpenAI usage & limits"
+              />
+
+              {/* Hosting */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <MiniStat label="Hosting" value={systemStatus.hosting.freeTier ? 'Render Free ($0)' : 'Paid'} />
+                <MiniStat label="Memory" value={systemStatus.hosting.memoryLimit} />
+                <MiniStat label="LLM Provider" value={systemStatus.openai.activeProvider} />
+                <MiniStat label="Cron jobs" value={systemStatus.hosting.cronConfigured ? '✅ Configured' : '❌ Not set'} />
+              </div>
+
+              {/* Free tier limits */}
+              {systemStatus.hosting.freeTier && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
+                  <p className="font-bold mb-1">Free tier video limits</p>
+                  <p>Max {systemStatus.freeTierLimits.maxVideoSeconds}s · {systemStatus.freeTierLimits.maxScenes} scenes · {systemStatus.freeTierLimits.renderResolution} · {systemStatus.freeTierLimits.renderTimeoutSeconds}s render timeout</p>
+                  <p className="mt-1 text-blue-600">{systemStatus.hosting.storageNote}</p>
+                </div>
+              )}
+
+              {/* Pipeline */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <MiniStat label="Jobs waiting" value={String(systemStatus.pipeline.jobsPending)} />
+                <MiniStat label="Jobs running" value={String(systemStatus.pipeline.jobsProcessing)} />
+                <MiniStat label="Jobs failed" value={String(systemStatus.pipeline.jobsFailed)} warn={systemStatus.pipeline.jobsFailed > 0} />
+                <MiniStat label="Stuck rendering" value={String(systemStatus.pipeline.stuckRendering)} warn={systemStatus.pipeline.stuckRendering > 0} />
+              </div>
+
+              {/* Why stuck */}
+              {systemStatus.freeTierLimits.whyStuck.length > 0 && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                  <p className="text-xs font-bold text-orange-800 mb-2">Why videos may get stuck</p>
+                  <ul className="text-xs text-orange-700 space-y-1 list-disc list-inside">
+                    {systemStatus.freeTierLimits.whyStuck.map((reason, i) => (
+                      <li key={i}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recent errors */}
+              {systemStatus.pipeline.recentErrors.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 mb-2">Recent failures</p>
+                  {systemStatus.pipeline.recentErrors.map((err) => (
+                    <div key={err.contentId} className="text-xs bg-red-50 border border-red-100 rounded-lg p-2 mb-1">
+                      <Link to={`/content/${err.contentId}`} className="font-semibold text-red-700 hover:underline">
+                        {err.title.substring(0, 50)}
+                      </Link>
+                      <p className="text-red-600 mt-0.5">Stage: {err.stage} — {err.error}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={loadSystemStatus}
+                className="text-xs text-purple-600 font-semibold hover:underline"
+              >
+                ↻ Refresh status
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-red-500">Could not load system status</p>
+          )}
+        </Section>
+
         <Section title="Channel">
           <Field label="Channel Name" value={config.channelName} onChange={(v) => setConfig({ ...config, channelName: v })} />
           <Field label="Target Age" value={config.targetAge} onChange={(v) => setConfig({ ...config, targetAge: v })} placeholder="2-6" />
@@ -270,6 +364,45 @@ function SelectField({ label, value, options, onChange }: {
           <option key={o} value={o}>{o}</option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function StatusCard({ title, status, message, detail, link, linkLabel }: {
+  title: string;
+  status: string;
+  message: string;
+  detail?: string;
+  link?: string;
+  linkLabel?: string;
+}) {
+  const colors: Record<string, string> = {
+    ok: 'bg-green-50 border-green-200 text-green-800',
+    error: 'bg-red-50 border-red-200 text-red-800',
+    not_configured: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+    mock: 'bg-gray-50 border-gray-200 text-gray-700',
+  };
+  const icons: Record<string, string> = { ok: '✅', error: '❌', not_configured: '⚠️', mock: '🔧' };
+
+  return (
+    <div className={`p-4 border rounded-xl ${colors[status] || colors.mock}`}>
+      <p className="font-bold text-sm">{icons[status] || '•'} {title}</p>
+      <p className="text-xs mt-1">{message}</p>
+      {detail && <p className="text-xs mt-2 opacity-80">{detail}</p>}
+      {link && (
+        <a href={link} target="_blank" rel="noreferrer" className="text-xs font-semibold underline mt-2 inline-block">
+          {linkLabel}
+        </a>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+  return (
+    <div className={`p-3 rounded-xl border ${warn ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
+      <p className="text-[10px] font-bold text-gray-400 uppercase">{label}</p>
+      <p className={`text-sm font-bold mt-0.5 ${warn ? 'text-red-600' : 'text-gray-800'}`}>{value}</p>
     </div>
   );
 }
