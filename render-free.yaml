@@ -7,12 +7,10 @@ services:
     name: kids-youtube
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build:free
-    startCommand: npm run start:free
+    buildCommand: npm ci --include=dev && npm run build:free
+    startCommand: NODE_ENV=production npm run start:free
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: FREE_TIER
         value: "true"
       - key: SERVE_FRONTEND
